@@ -4,8 +4,11 @@ from resources import subgraph_urls
 from orders import get_order_info
 from trades import get_trades
 from resets import add_resets_column, calculate_trades_between_resets
-# Define the Subgraph Endpoint URL
-subgraph_url = subgraph_urls["flare"]
+
+# Define the network
+# current options are: flare, base, polygon, arbitrum, bsc, linea, ethereum
+# note, this is the network the order was made on
+network = "flare"
 
 # Define query parameters/variables
 target_order_hash = "0xa3ee58f8abfb991496e9fc6b16ada0162a0513429b2061c4073a3a19588ef712"
@@ -13,6 +16,9 @@ target_order_hash = "0xa3ee58f8abfb991496e9fc6b16ada0162a0513429b2061c4073a3a195
 # define the start and end timestamps
 start_date_str = "2025-01-01"
 end_date_str = "2025-04-08"
+
+# get the Subgraph Endpoint URL
+subgraph_url = subgraph_urls[network]
 
 # get the order info
 order_info = get_order_info(target_order_hash, subgraph_url)
