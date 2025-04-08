@@ -55,7 +55,15 @@ def get_order_info(order_hash, url):
         }
     """
 
-    order_response = execute_query(url, query, {"orderHash": order_hash})
-    order_data = order_response["data"]["orders"][0]
+    try:
+        order_payload = execute_query(url, query, {"orderHash": order_hash})
 
-    return order_data
+        if order_payload and len(order_payload["data"]["orders"]) > 0:
+            return order_payload["data"]["orders"][0]
+        else:
+            print(f"No order payload found for order {order_hash}")
+            return None
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
