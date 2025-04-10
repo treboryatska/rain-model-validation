@@ -2,9 +2,7 @@
 
 This module runs a statistical comparison between actual DSF strategy results and outputs from a modeled DSF strategy using real market data as inputs.
 
-Use main.py as the entrypoint. The required parameters are network, target_order_hash, start_date_str, and end_date_str.
-
-Ensure the actual market data inputs to the model have the same date range as parameters start_date_str and end_date_str from main.py.
+Use main.py as the entrypoint. The required parameters are model_file, network, target_order_hash, start_date_str, and end_date_str.
 
 ### Validation steps
 
@@ -16,7 +14,14 @@ Ensure the actual market data inputs to the model have the same date range as pa
   - The required columns are block_number, dex_pool_address, tx_hash, token_amount_a, token_amount_b, timestamp
   - The first step should be to clear out any existing data in these columns
   - Note several things: (1) the Data tab is indifferent to which token is labeled as token_a or token_b, (2) the remaining columns cell reference the input data--these fields should not be modified or overwritten; and (3) the 'ABS USD' cell has a #REF error--ignore for now
-- 
+- Rename the Google sheet to the following format: {model_name}_{order_hash}
+  - e.g. model_1_0xa3ee58f8abfb991496e9fc6b16ada0162a0513429b2061c4073a3a19588ef712
+  - Set the sheet name as the value to the input field model_file in main.py
+
+### Automated data input tests
+- Check actual market data input date range. Warn the user when:
+  -  Market data start date is > start_date_str from main.py
+  -  Market data end date is < end_date_str from main.py
 
 ### to do
 - identify sample of order hashes for analysis
