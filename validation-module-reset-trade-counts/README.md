@@ -31,6 +31,7 @@ Use main.py as the entrypoint. The required parameters are model_file_path, netw
 ### to do
 - identify sample of order hashes for analysis
    - needs to be large enough to give us assurance in results
+- add instructions for downloading the market data csv files. This same dataset should be used as input to the 'Data' tab of the model.
 - merge strategy trades with market data in order to count trades between resets
 - need testing scripts for basic outliers in this module
 - ingestion for modeled outputs (all order hashes in sample)
