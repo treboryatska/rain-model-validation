@@ -2,7 +2,7 @@
 
 This module runs a statistical comparison between actual DSF strategy results and outputs from a modeled DSF strategy using real market data as inputs.
 
-Use main.py as the entrypoint. The required parameters are model_file, network, target_order_hash, start_date_str, and end_date_str.
+Use main.py as the entrypoint. The required parameters are model_file_path, network, target_order_hash, start_date_str, and end_date_str.
 
 ### Validation steps
 
@@ -14,11 +14,15 @@ Use main.py as the entrypoint. The required parameters are model_file, network, 
   - The required columns are block_number, dex_pool_address, tx_hash, token_amount_a, token_amount_b, timestamp
   - The first step should be to clear out any existing data in these columns
   - Note several things: (1) the Data tab is indifferent to which token is labeled as token_a or token_b, (2) the remaining columns cell reference the input data--these fields should not be modified or overwritten; and (3) the 'ABS USD' cell has a #REF error--ignore for now
-- Rename the Google sheet to the following format: {model_name}_{order_hash}
-  - e.g. model_1_0xa3ee58f8abfb991496e9fc6b16ada0162a0513429b2061c4073a3a19588ef712
-  - Set the sheet name as the value to the input field model_file in main.py
+- Rename the Google sheet to the standard format, {model_name}_{order_hash} e.g. model_1_0xa3ee58f8abfb991496e9fc6b16ada0162a0513429b2061c4073a3a19588ef712
+- Navigate to the appropriate tab in the model e.g. 15M, 30M, etc.
+- Download the Google sheet tab to your local computer as a *csv*
+  - Set the main.py input field, {model_file_path} to the local model file path
+     - e.g. {users/shared/downloads/model_1_0xa3ee58f8abfb991496e9fc6b16ada0162a0513429b2061c4073a3a19588ef712  - Test-15M.csv}
+     - Note the file name on your local machine. csv file downloads are tab specific. The tab name is appended to the file name.
 
 ### Automated data input tests
+- Validation will exit if the model file path is incorrect
 - Check actual market data input date range. Warn the user when:
   -  Market data start date is > start_date_str from main.py
   -  Market data end date is < end_date_str from main.py
