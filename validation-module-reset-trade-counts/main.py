@@ -4,6 +4,11 @@ from resources import subgraph_urls
 from orders import get_order_info
 from trades import get_trades
 from resets import add_resets_column, calculate_trades_between_resets
+from check import check_model_file_path, check_date_range, check_model_file_columns
+
+# define the location of the actual model output file
+# connect to google sheets to get the model output file
+model_file_path = "/Users/trevorjacka/Downloads/model_1_0xa3ee58f8abfb991496e9fc6b16ada0162a0513429b2061c4073a3a19588ef712  - Test-15M 2.csv"
 
 # Define the network
 # current options are: flare, base, polygon, arbitrum, bsc, linea, ethereum
@@ -14,11 +19,44 @@ network = "flare"
 target_order_hash = "0xa3ee58f8abfb991496e9fc6b16ada0162a0513429b2061c4073a3a19588ef712"
 
 # define the start and end timestamps
+# format: %Y-%m-%d
 start_date_str = "2025-01-01"
 end_date_str = "2025-04-08"
 
 # get the Subgraph Endpoint URL
 subgraph_url = subgraph_urls[network]
+
+# inform the user that the model output data must start at row 23
+rows_to_skip = 22
+print(f"The model output data must start at row {rows_to_skip + 1} of the model file")
+print(f"adjust the rows_to_skip variable to the correct row number for your model file")
+print("the validation script will fail if it cannot find the data at the correct row number")
+
+# check the model file path appears valid
+if not check_model_file_path(model_file_path):
+    raise ValueError("Model file path is not valid")
+
+# get the model file and check it is valid
+# the model output data must start at row 23
+# if the model file does not contain the date/time and trade_count_btwn_resets columns, raise an error
+df_model = pd.read_csv(model_file_path, skiprows=rows_to_skip)
+if df_model is None:
+    raise ValueError("Model file is not valid")
+
+# check the model file contains the date/time and trade_count_btwn_resets columns
+if not check_model_file_columns(model_file_path, df_model):
+    raise ValueError("Model file does not contain the date/time and trade_count_btwn_resets columns")
+
+# check the date range of the model file is valid
+if not check_date_range(start_date_str, end_date_str, model_file_path, df_model):
+    raise ValueError("Date range of model file is not valid. Exiting...")
+
+# get the trade count between resets from the model file
+trade_count_btwn_resets_modeled = df_model['trade_count_btwn_resets'].iloc[0]
+
+# check that the trade count between resets is not None
+if trade_count_btwn_resets_modeled is None:
+    raise ValueError("No trade count between resets found in the model file")
 
 # get the order info
 order_info = get_order_info(target_order_hash, subgraph_url)
@@ -103,3 +141,14 @@ if df_trades is not None:
 
 else:
     print(f"No trades found for order {target_order_hash} between {start_date_str} and {end_date_str}")
+
+
+# #####################################################################################
+# run tests on modeled trade count between resets and actual trade count between resets
+# #####################################################################################
+
+# test 1: modeled trade count between resets is equal to actual trade count between resets
+if trade_count_btwn_resets_modeled == df_trades_resets['rows_since_last_reset'].sum():
+    print("Test 1 passed: modeled trade count between resets is equal to actual trade count between resets")
+else:
+    print("Test 1 failed: modeled trade count between resets is not equal to actual trade count between resets")
