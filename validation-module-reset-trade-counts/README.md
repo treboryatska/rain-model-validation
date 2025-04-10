@@ -23,7 +23,7 @@ Use main.py as the entrypoint. The required parameters are model_file_path, netw
 
 ### Automated data input tests
 - Validation will exit if the model file path is incorrect
-- Validation will exit if it cannot find the columns "Date/time" and "trade_count_btwn_resets"
+- Validation will exit if it cannot find the columns "Date/time" and "trade_count_in_reset"
 - Check actual market data input date range. Warn the user when:
   -  Market data start date is > start_date_str from main.py
   -  Market data end date is < end_date_str from main.py
