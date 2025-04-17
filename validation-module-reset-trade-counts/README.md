@@ -2,7 +2,7 @@
 
 This module runs a statistical comparison between actual DSF strategy results and outputs from a modeled DSF strategy using real market data as inputs.
 
-Use main.py as the entrypoint. The required parameters are model_file_path, network, target_order_hash, start_date_str, and end_date_str.
+Use main.py as the entrypoint. The required parameters for main.py are model_file_path, network, target_order_hash, start_date_str, and end_date_str.
 
 ### Data input dates
 We define three distinct datetime stamps: (1) strategy deployment, (2) strategy funding, and (3) strategy trading initiated. 
