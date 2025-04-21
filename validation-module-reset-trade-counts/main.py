@@ -14,6 +14,7 @@ from check import (
     clean_model_input_file, 
     clean_model_output_file
 )
+from stats import basic_stats
 
 print("\n#################################################################################################################################")
 print("#################################################################################################################################")
@@ -27,21 +28,21 @@ print("#########################################################################
 
 # define the location of the actual model output file
 # connect to google sheets to get the model output file
-model_input_file_path = "/Users/trevorjacka/Downloads/model_1_0xa3ee58f8abfb991496e9fc6b16ada0162a0513429b2061c4073a3a19588ef712  - Data.csv"
-model_output_file_path = "/Users/trevorjacka/Downloads/model_1_0xa3ee58f8abfb991496e9fc6b16ada0162a0513429b2061c4073a3a19588ef712  - Test-15M.csv"
+model_input_file_path = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzY4ojDhxerTo5bEaShVSXK1bDx-QBx5wwJTI2EQDegjNiE48u-a_XhDUvNHa6x_s-pZ4BMR83k3i3/pub?gid=634861611&single=true&output=csv"
+model_output_file_path = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzY4ojDhxerTo5bEaShVSXK1bDx-QBx5wwJTI2EQDegjNiE48u-a_XhDUvNHa6x_s-pZ4BMR83k3i3/pub?gid=2118869616&single=true&output=csv"
 
 # Define the network
 # current options are: flare, base, polygon, arbitrum, bsc, linea, ethereum
 # note, this is the network the order was made on
-network = "flare"
+network = "base"
 
 # Define query parameters/variables
-target_order_hash = "0xa3ee58f8abfb991496e9fc6b16ada0162a0513429b2061c4073a3a19588ef712"
+target_order_hash = "0xbdffe74d38286fe9182c52e79161ed9d87e71a5133c34c069b2e3e541a74f9df"
 
 # define the start and end timestamps
 # format: %Y-%m-%d
-start_date_str = "2025-01-01"
-end_date_str = "2025-04-08"
+start_date_str = "2024-10-31"
+end_date_str = "2025-04-17"
 
 # get the Subgraph Endpoint URL
 subgraph_url = subgraph_urls[network]
@@ -150,8 +151,8 @@ print("\n--------------------------------\nFinished getting order info and trade
 print("\n--------------------------------\nGetting model input data\n--------------------------------\n")
 
 # check the model file path appears valid
-if not check_model_file_path(model_input_file_path):
-    raise ValueError("Model input file path is not valid")
+# if not check_model_file_path(model_input_file_path):
+#     raise ValueError("Model input file path is not valid")
 
 # get the model file and check it is valid
 # the model input data starts at row 1
@@ -238,8 +239,8 @@ print("\n--------------------------------\nFinished getting model input data\n--
 print("\n--------------------------------\nGetting model output data\n--------------------------------\n")
 
 # check the model file path appears valid
-if not check_model_file_path(model_output_file_path):
-    raise ValueError("Model outputfile path is not valid")
+# if not check_model_file_path(model_output_file_path):
+#     raise ValueError("Model outputfile path is not valid")
 
 # get the model output file and check it is valid
 # the model output data must start at row 23
@@ -283,10 +284,11 @@ try:
 
     # check the date range of the model output data file is valid
     # compare date ranges specified in start_date_obj to the start date of the model input file
-    # these dates should be within 15 minutes of each other
+    # these dates should be within 90 minutes of each other
+    # note this is more lenient than the model input data file due to the floor function used in the model outputs
     print(f"checking date range of model output data file...")
     model_output_file_start_date = df_model_trade_count_in_reset['datetime'].min()
-    if abs(model_output_file_start_date - strategy_trades_date_begin) > pd.Timedelta(minutes=15):
+    if abs(model_output_file_start_date - strategy_trades_date_begin) > pd.Timedelta(minutes=95):
         print("Date range of model output data file is not valid.")
         print(f"model output data file start date: {model_output_file_start_date}")
         print(f"strategy trades start date: {strategy_trades_date_begin}")
@@ -328,11 +330,17 @@ df_all_trades = concatenate_strategy_trades_with_market_trades(df_trades_resets,
 if df_all_trades is None:
     raise ValueError("df_all_trades is None. Exiting...")
 
+# print info about df_all_trades
+print("\ndf_all_trades")
+print(df_all_trades.info())
+print(df_all_trades.head())
+
+print("\n--------------------------------\nFinished concatenating model input data with strategy trades\n--------------------------------\n\n")
 # #####################################################################################
 # end of concatenate model input data with strategy trades
 # #####################################################################################
 
-print("\n--------------------------------\nFinished concatenating model input data with strategy trades\n--------------------------------\n\n")
+
 # #####################################################################################
 # run tests on modeled trade count between resets and actual trade count between resets
 # #####################################################################################
@@ -352,9 +360,10 @@ print(f"the date of the last trade in the strategy: {strategy_trades_date_end}")
 print(f"Date range of modeled outputs data: {df_model_trade_count_in_reset['datetime'].min()} to {df_model_trade_count_in_reset['datetime'].max()}")
 print(f"Date range of the concatenated strategy trades and market trades data: {df_all_trades['trade_timestamp'].min()} to {df_all_trades['trade_timestamp'].max()}")
 
-# test 1: modeled trade count between resets is equal to actual trade count between resets
-print(f"\nAverage number of trades between resets in the model file: {df_model_trade_count_in_reset['trade_count_in_reset'][df_model_trade_count_in_reset['trade_count_in_reset'] != 0].mean()}")
-print(f"Average number of trades between resets in the concatenated strategy trades and market trades data: {df_all_trades['rows_since_last_reset'][df_all_trades['resets'] == True].mean()}")
-
+# get the basic stats
+strategy_basic_stats = basic_stats(df_trades_resets, df_all_trades, df_market_trades_clean, df_model_trade_count_in_reset)
 
 print("\n--------------------------------\nFinished running tests on modeled trade count between resets and actual trade count between resets\n--------------------------------\n")
+# #####################################################################################
+# end of run tests on modeled trade count between resets and actual trade count between resets
+# #####################################################################################

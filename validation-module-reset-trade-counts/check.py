@@ -147,15 +147,20 @@ def clean_model_output_file(df_model):
     if df_model['trade_count_in_reset'].dtype != 'int64':
 
         print(f"trade_count_in_reset column is not an integer. Coercing to integer...\n")
+        print("First convert the column to str; this allows us to deal with comma separated values")
+        df_model['trade_count_in_reset'] = df_model['trade_count_in_reset'].astype(str)
+        print("Replacing commas with empty strings...\n")
+        df_model['trade_count_in_reset'] = df_model['trade_count_in_reset'].str.replace(',', '', regex=False)
+        print("Converting to numeric...\n")
 
-        # coerce the trade_count_in_reset column to numeric
-        df_model['trade_count_in_reset'] = pd.to_numeric(df_model['trade_count_in_reset'], errors='coerce')
+        # coerce the trade_count_in_reset column to numeric; round to handle any decimals since they are irrelevant
+        df_model['trade_count_in_reset'] = pd.to_numeric(df_model['trade_count_in_reset'], errors='coerce').round()
 
         # check if there are null values in the trade_count_in_reset column
         if df_model['trade_count_in_reset'].isnull().any():
             null_count_model_trades = df_model['trade_count_in_reset'].isnull().sum()
-            print(f"found {null_count_model_trades} nulls in the trade_count_in_reset column. Setting nulls to 0")
-            df_model['trade_count_in_reset'].fillna(value=0, inplace=True)
+            print(f"found {null_count_model_trades} nulls in the trade_count_in_reset column. Leaving nulls.")
+        #     df_model['trade_count_in_reset'].fillna(value=0, inplace=True)
 
         df_model['trade_count_in_reset'] = df_model['trade_count_in_reset'].astype('Int64')
 
