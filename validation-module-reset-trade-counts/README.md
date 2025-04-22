@@ -1,4 +1,4 @@
-## Raindex strategies - model validation
+## Rain strategies - model validation
 
 This module runs a statistical comparison between actual DSF strategy results and outputs from a modeled DSF strategy using real market data as inputs.
 
@@ -57,7 +57,7 @@ Use main_batch.py as the entry point. The only required parameter is batch_sampl
 
 Use the template provided here: https://docs.google.com/spreadsheets/d/1kke5DwTi9wL5JxABRiqPLe171kThWRazP94MyiSul3s/edit?gid=0#gid=0
 
-For each order hash in the sample, fill-in the columns. 
+For each order hash in the sample, fill in the columns. 
 
 The columns model_view_url, model_root_url, model_data_url, model_test15m_url, model_30m_url, model_15m_url, model_60m_url, model_90m_url should be completed for each order hash modeled. The urls input into these columns represent the published csv files for each tab in the respective models. Note, you have to publish each tab for each model separately. 
 
