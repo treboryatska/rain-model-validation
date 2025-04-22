@@ -20,6 +20,11 @@ from stats import basic_stats
 
 # get the sample of order for the model batch
 batch_sample_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSZIpAiKpNkf85Nja7XnJf1UsqjKD2QzeRCF4KfXJXkfOVsYkLCl1DjjjBFTwoWnyND6QmR9kBCLtkN/pub?gid=1535040418&single=true&output=csv"
+
+# tell the validation script where to output the validation outputs
+today = datetime.now().strftime("%Y-%m-%d")
+output_file_path = f"~/Downloads/validation_outputs_{today}.csv"
+
 orders = get_sample_dataset(batch_sample_url)
 
 # model list
@@ -69,6 +74,7 @@ for model in model_list:
         print(f"Start date: {start_date_str}")
         print(f"End date: {end_date_str}")
         print(f"Subgraph URL: {subgraph_url}")
+        print(f"Output file path: {output_file_path}")
         print(f"Rows to skip at the top of the model file: {rows_to_skip}")
         print("\nWarning:")
         print(f"The model output data must start at row {rows_to_skip + 1} of the model file")
@@ -400,6 +406,4 @@ print(df_validation_outputs.info())
 print(df_validation_outputs.head())
 
 # write the validation outputs to a csv file
-# get today's date
-today = datetime.now().strftime("%Y-%m-%d")
-df_validation_outputs.to_csv(f"~/Downloads/validation_outputs_{today}.csv", index=False)
+df_validation_outputs.to_csv(output_file_path, index=False)
