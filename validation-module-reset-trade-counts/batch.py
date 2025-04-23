@@ -53,7 +53,46 @@ def get_sample_dataset(batch_sample_url):
     except Exception as e:
         print(f"An error occurred during CSV processing: {e}")
         raise Exception(f"An error occurred during CSV processing: {e}")
+    
+# get aggregated results
+# user must have created outputs using main_batch.py
+def get_aggregated_results(aggregated_results_url):
+    try:
+        # 1. Fetch the data from the URL
+        response = requests.get(aggregated_results_url)
+        response.raise_for_status() # Raise an exception for bad status codes (like 404 or 500)
 
+        # 2. Read the CSV data
+        # Use io.StringIO to handle the CSV data directly from the response text
+        csv_data = io.StringIO(response.text)
+
+        # Create a CSV reader object
+        # Assuming the first row contains headers   
+        reader = csv.reader(csv_data)
+
+        # Read the header row (A1:J1)
+        headers = next(reader)
+
+        # 3. Create a list of dictionaries
+        orders = []
+        for row in reader:
+            # Create a dictionary for each row, mapping headers to row values
+            row_dict = {header: value for header, value in zip(headers, row)}
+            orders.append(row_dict)
+
+        # check if orders is empty
+        if len(orders) == 0:
+            print("No orders found in the aggregated results")
+            raise Exception("No orders found in the aggregated results")
+
+        # Now `orders` contains your data as a list of dictionaries
+        print(f"Successfully retrieved and parsed {len(orders)} rows.")
+
+        return orders
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching data from URL: {e}")
+        raise Exception(f"Error fetching data from URL: {e}")
 
 
 # create a function that gets the strategy trades for each order, generates the reset events, and then counts the number of resets for each order hash

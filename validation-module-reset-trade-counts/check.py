@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import warnings
 # check validation script input files for consistency
 
 # check the model_file path appears valid
@@ -174,3 +175,77 @@ def clean_model_output_file(df_model):
     return df_model
 
 
+# fail main_stats.py if columns are missing from the aggregated results
+# warn if record counts are less than 15 for each model version
+# fail if nulls in actual strategy results
+def check_aggregated_results(orders_df):
+
+    # check that orders_df is a dataframe
+    if not isinstance(orders_df, pd.DataFrame):
+        print("orders_df is not a dataframe")
+        raise Exception("orders_df is not a dataframe")
+    
+    # check if the orders are empty
+    if orders_df.empty:
+        print("No orders found in the aggregated results")
+        raise Exception("No orders found in the aggregated results")
+    
+    # check if a sample of the columns are present
+    print(f"\nChecking a sample of columns are present in aggregated result file to confirm we have the correct file...")
+    column_list = ["model_view_url",    
+                "target_order_hash",
+                "model_version",
+                "network",
+                "start_date_str",
+                "end_date_str",
+                "model_input_trade_count",
+                "strategy_trade_count",
+                "actual_reset_count", 
+                "actual_median_trade_count_between_resets", 
+                "actual_average_trade_count_between_resets", 
+                "actual_std_trade_count_between_resets",
+                "median_trade_count_difference_modeled_vs_actual",   
+                "average_trade_count_difference_modeled_vs_actual",
+                "std_trade_count_difference_modeled_vs_actual",
+                "reset_count_difference_modeled_vs_actual",
+                ]
+
+    # Convert column_list and the DataFrame columns to sets
+    required_columns = set(column_list)
+    actual_columns = set(orders_df.columns)
+
+    # Check if all required columns are present in the actual columns
+    if not required_columns.issubset(actual_columns):
+        # Find which columns are missing for a more informative error message
+        missing_columns = required_columns - actual_columns # Set difference
+        print(f"Error: The following required columns are missing from the DataFrame: {list(missing_columns)}")
+        # raise an error
+        raise Exception(f"The following required columns are missing from the DataFrame: {list(missing_columns)}")
+    else:
+        print("All required columns are present. Appears to be a valid aggregated results file.")
+
+    # check if the record count is less than 15 for each model version
+    print(f"\nChecking if the record count is less than 15 for each model version...")
+    print(f"Model versions found in aggregated results: {orders_df['model_version'].unique()}")
+    sample_size = True
+    for model_version in orders_df['model_version'].unique():
+        model_version_orders = orders_df[orders_df['model_version'] == model_version]
+        if len(model_version_orders) < 15:
+            warning_message = (f"Warning: The number of records for model version {model_version} is {len(model_version_orders)}. "
+                            f"This may be too low for meaningful conclusions.")
+            print(warning_message) 
+            warnings.warn(warning_message, UserWarning) # Use warnings.warn()
+            sample_size = False
+    if sample_size:
+        print(f"All model versions have more than 15 records.")
+
+    # check if nulls in actual strategy results
+    print(f"\nChecking if there are nulls in the actual strategy results...")
+    strategy_columns = ["actual_reset_count", "actual_median_trade_count_between_resets", "actual_average_trade_count_between_resets", "actual_std_trade_count_between_resets"]
+    for strategy_column in strategy_columns:
+        if orders_df[strategy_column].isnull().any():
+            # fail if nulls in actual strategy results
+            raise Exception(f"There are nulls in the {strategy_column} column.")
+    print(f"No nulls in the actual strategy results.\n")
+    
+    return True
