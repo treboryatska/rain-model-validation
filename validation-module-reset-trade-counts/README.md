@@ -61,13 +61,15 @@ For each order hash in the sample, fill in the columns on the 'strategy sample' 
 
 The columns model_view_url, model_root_url, model_data_url, model_test15m_url, model_30m_url, model_15m_url, model_60m_url, model_90m_url should be completed for each order hash modeled. The urls input into these columns represent the published csv files for each tab in the respective models. Note, you have to publish each tab for each model separately. 
 
-
-
 ### Run the batch validation job
 
 It is likely the dates of each model file will need to be slightly adjusted to align with the first and last strategy trade dates. 
 
 The output of the batch validation script is a local csv file. You can modify where this file is output by adjusting the output_file_path parameter. 
+
+## Create statistics
+
+Use main_stats.py as the entrypoint. Point the parameter aggregated_results_url to the output file of main_batch.py that has been uploaded to google sheets and published to the internet as csv. The only other parameter that needs to be specified is output_dir; this tells the script where to save the stats ouputs, which consist of both a csv file with test results and chart png files. 
 
 ## Validation script execution path
 - user-defined validation parameters
