@@ -32,19 +32,19 @@ def check_model_input_file_columns(model_input_file_path, df_market_trades):
     print(f"Model input file contains the tx_hash and timestamp columns")
     return True
 
-# check the model file contains the date/time and trade_count_in_reset columns
+# check the model file contains the date/time and auction_count_in_reset columns
 def check_model_output_file_columns(model_output_file_path, df_model):
     # check if the date/time column is in the model file
     date_time_column = df_model.columns[df_model.columns.str.contains('date/time', case=False)]
     if date_time_column.empty:
         print(f"\nError: date/time column not found in model file: {model_output_file_path}")
         return False
-    # check if the trade_count_in_reset column is in the model file
-    trade_count_in_reset_column = df_model.columns[df_model.columns.str.contains('trade_count_in_reset', case=False)]
-    if trade_count_in_reset_column.empty:
-        print(f"\nError: trade_count_in_reset column not found in model file: {model_output_file_path}")
+    # check if the auction_count_in_reset column is in the model file
+    auction_count_in_reset_column = df_model.columns[df_model.columns.str.contains('auction_count_in_reset', case=False)]
+    if auction_count_in_reset_column.empty:
+        print(f"\nError: auction_count_in_reset column not found in model file: {model_output_file_path}")
         return False
-    print(f"Model file contains the date/time and trade_count_in_reset columns")
+    print(f"Model file contains the date/time and auction_count_in_reset columns")
     return True
 
 # clean the model input file
@@ -104,22 +104,22 @@ def clean_model_output_file(df_model):
     # print the column and row count of the model file
     print(f"----- \nInitial model output data file shape: \nColumn count: {len(df_model.columns)} \nRow count: {len(df_model)} \n-----\n")
     
-    # check that Date/time and trade_count_in_reset exist in the model file
+    # check that Date/time and auction_count_in_reset exist in the model file
     if 'Date/time' not in df_model.columns:
         print(f"Error: Date/time column not found in model file")
         return False
-    if 'trade_count_in_reset' not in df_model.columns:
-        print(f"Error: trade_count_in_reset column not found in model output data file")
+    if 'auction_count_in_reset' not in df_model.columns:
+        print(f"Error: auction_count_in_reset column not found in model output data file")
         return False
     
     # rename Date/time to datetime
     df_model.rename(columns={'Date/time': 'datetime'}, inplace=True)
 
-    # there should only be two columns in the model file: Date/time and trade_count_in_reset
+    # there should only be two columns in the model file: Date/time and auction_count_in_reset
     if len(df_model.columns) != 2:
-        print(f"found {len(df_model.columns)} columns in the model output data file. It should have 2 columns: Date/time and trade_count_in_reset")
-        print(f"dropping all columns except Date/time and trade_count_in_reset...\n")
-        df_model = df_model[['datetime', 'trade_count_in_reset']].copy()
+        print(f"found {len(df_model.columns)} columns in the model output data file. It should have 2 columns: Date/time and auction_count_in_reset")
+        print(f"dropping all columns except Date/time and auction_count_in_reset...\n")
+        df_model = df_model[['datetime', 'auction_count_in_reset']].copy()
 
     # coerce the datetime column to a datetime object
     if df_model['datetime'].dtype != 'datetime64[ns]':
@@ -144,30 +144,30 @@ def clean_model_output_file(df_model):
     else:
         print(f"datetime column is a datetime object")
 
-    # coerce the trade_count_in_reset column to an integer
-    if df_model['trade_count_in_reset'].dtype != 'int64':
+    # coerce the auction_count_in_reset column to an integer
+    if df_model['auction_count_in_reset'].dtype != 'int64':
 
-        print(f"trade_count_in_reset column is not an integer. Coercing to integer...\n")
+        print(f"auction_count_in_reset column is not an integer. Coercing to integer...\n")
         print("First convert the column to str; this allows us to deal with comma separated values")
-        df_model['trade_count_in_reset'] = df_model['trade_count_in_reset'].astype(str)
+        df_model['auction_count_in_reset'] = df_model['auction_count_in_reset'].astype(str)
         print("Replacing commas with empty strings...\n")
-        df_model['trade_count_in_reset'] = df_model['trade_count_in_reset'].str.replace(',', '', regex=False)
+        df_model['auction_count_in_reset'] = df_model['auction_count_in_reset'].str.replace(',', '', regex=False)
         print("Converting to numeric...\n")
 
-        # coerce the trade_count_in_reset column to numeric; round to handle any decimals since they are irrelevant
-        df_model['trade_count_in_reset'] = pd.to_numeric(df_model['trade_count_in_reset'], errors='coerce').round()
+        # coerce the auction_count_in_reset column to numeric; round to handle any decimals since they are irrelevant
+        df_model['auction_count_in_reset'] = pd.to_numeric(df_model['auction_count_in_reset'], errors='coerce').round()
 
-        # check if there are null values in the trade_count_in_reset column
-        if df_model['trade_count_in_reset'].isnull().any():
-            null_count_model_trades = df_model['trade_count_in_reset'].isnull().sum()
-            print(f"found {null_count_model_trades} nulls in the trade_count_in_reset column. Leaving nulls.")
-        #     df_model['trade_count_in_reset'].fillna(value=0, inplace=True)
+        # check if there are null values in the auction_count_in_reset column
+        if df_model['auction_count_in_reset'].isnull().any():
+            null_count_model_trades = df_model['auction_count_in_reset'].isnull().sum()
+            print(f"found {null_count_model_trades} nulls in the auction_count_in_reset column. Leaving nulls.")
+        #     df_model['auction_count_in_reset'].fillna(value=0, inplace=True)
 
-        df_model['trade_count_in_reset'] = df_model['trade_count_in_reset'].astype('Int64')
+        df_model['auction_count_in_reset'] = df_model['auction_count_in_reset'].astype('Int64')
 
-        print(f"trade_count_in_reset column converted to an integer")
+        print(f"auction_count_in_reset column converted to an integer")
     else:
-        print(f"trade_count_in_reset column is an integer")
+        print(f"auction_count_in_reset column is an integer")
 
     # print the column and row count of the model file
     print(f"----- \nModel output data file shape after cleaning: \nColumn count: {len(df_model.columns)} \nRow count: {len(df_model)} \n-----\n")

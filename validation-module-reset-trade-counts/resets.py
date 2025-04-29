@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 # function to add a column to the dataframe that tracks resets in DSF strategies
 def add_resets_column(df):
@@ -46,7 +47,7 @@ def calculate_trades_between_resets(df):
     if missing_columns:
         print("Cannot calculate the number of trades between resets.")
         raise ValueError(f"The required columns are missing from the dataframe: {missing_columns}")
-    print("The concatenated dataframe is the right object type and has the required columns. Continuing...")
+    print("The dataframe is the right object type and has the required columns. Continuing...")
     
     try:
         # ensure the df is sorted by trade_timestamp
@@ -96,121 +97,111 @@ def calculate_trades_between_resets(df):
     except Exception as e:
         print(f"Error: {e}")
         return None
-
-# function to merge strategy trades with the market trades
-def concatenate_strategy_trades_with_market_trades(df_strategy_trades, df_market_trades):
-    # this module filters the strategy trades for resets == True
-    # then it concatenates the "reset" txs with the market trades dataframes
-    # then it orders the concatenated dataframe by trade_timestamp
-    # where do we get the actual trade data from? Just manually download it from the csv files sid pulled. Good for a first pass.
-    # why do we keep only the reset txs? any txs in the strategy that are not resets are either irrelevant for this analysis or are duplicates of the market trades
-    # we only need the reset txs as the "checkpoint" to trigger when we should reset our count of trades between resets
-
-    # confirm the passed variables are dataframes
-    if not isinstance(df_strategy_trades, pd.DataFrame):
-        raise ValueError("The passed variable is not a dataframe")
-    if not isinstance(df_market_trades, pd.DataFrame):
-        raise ValueError("The passed variable is not a dataframe")
     
-    # filter the strategy trades for resets == True
-    df_strategy_trades_resets_only = df_strategy_trades[df_strategy_trades['resets'] == True]
-    
-    # rename datetime to trade_timestamp
-    df_market_trades.rename(columns={'datetime': 'trade_timestamp'}, inplace=True)
-    # check column types first
-    print(f"Checking column types between strategy trades and market trades...")
-    if df_strategy_trades_resets_only[['tx_hash', 'trade_timestamp']].dtypes.equals(df_market_trades[['tx_hash', 'trade_timestamp']].dtypes):
-        print("Column types are the same")
-    else:
-        print("Column types are different")
-        print(df_strategy_trades_resets_only[['tx_hash', 'trade_timestamp']].dtypes)
-        print(df_market_trades[['tx_hash', 'trade_timestamp']].dtypes)
-        
-        if df_strategy_trades_resets_only['trade_timestamp'].dtype != df_market_trades['trade_timestamp'].dtype:
-            print("trade_timestamp column types are different")
-            print("coercing the version that is int64 to datetime")
-            if df_strategy_trades_resets_only['trade_timestamp'].dtype == 'int64':
-                print("coercing strategy trades trade_timestamp to datetime")
-                df_strategy_trades_resets_only['trade_timestamp'] = pd.to_datetime(df_strategy_trades_resets_only['trade_timestamp'], unit='s')
-                print("strategy trades trade_timestamp coerced to datetime")
-            else:
-                print("coercing market trades trade_timestamp to datetime")
-                df_market_trades['trade_timestamp'] = pd.to_datetime(df_market_trades['trade_timestamp'], unit='s')
-                print("market trades trade_timestamp coerced to datetime")
-        else:
-            print("tx_hash column types are different")
-            print(df_strategy_trades_resets_only['tx_hash'].dtype)
-            print(df_market_trades['tx_hash'].dtype)
+# function to calculate the number of minutes between resets
+def calculate_minutes_between_resets(df):
+    """
+    Calculates the time difference in minutes between consecutive rows
+    where the 'resets' column is True, based on the 'trade_timestamp'.
 
-    # concatenate the two dataframes 
-    print("Concatenating the strategy trades and market trades dataframes...")
-    df_all_trades = pd.concat([df_strategy_trades_resets_only[['tx_hash', 'trade_timestamp', 'resets']], df_market_trades[['tx_hash', 'trade_timestamp']]], ignore_index=True)
-    print("Concatenated the strategy trades and market trades dataframes...")
-    print("Filling NaN values in 'resets' column with False...")
-    # Fill the NaN values specifically in the 'resets' column with False
-    df_all_trades['resets'] = df_all_trades['resets'].fillna(False)
-    df_all_trades['resets'] = df_all_trades['resets'].astype(bool)
+    Args:
+        df (pd.DataFrame): DataFrame containing 'trade_timestamp' and 'resets' columns.
+                           'trade_timestamp' can be datetime objects, Unix timestamps (seconds),
+                           or datetime strings.
 
-    # order the df by trade_timestamp
-    df_all_trades = df_all_trades.sort_values(by='trade_timestamp', ascending=True, ignore_index=True)
+    Returns:
+        pd.DataFrame: A new DataFrame with the added 'minutes_since_last_reset' column,
+                      or None if an error occurs. The column contains the difference in minutes
+                      on rows where resets=True (NaN for the first reset). Other rows have NaN.
+                      Returns the DataFrame with just the NaN column if no resets are found.
+    """
+    # confirm the passed variable is a dataframe
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("The input must be a pandas DataFrame")
+
+    # confirm the required columns are present in the dataframe
+    required_columns = ["trade_timestamp", "resets"]
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        print("Cannot calculate the number of minutes between resets.")
+        raise ValueError(f"The required columns are missing from the dataframe: {missing_columns}")
+
+    print("Input DataFrame is valid and has required columns. Processing...")
 
     try:
-        # flag and handle duplicate tx_hash values in the concatenated dataframe
-        if df_all_trades.duplicated(subset=['tx_hash']).any():
-            print("\n*********************************************************************************")
-            print("Duplicate tx_hash values in the concatenated dataframe")
-            print("*********************************************************************************\n")
+        # Create a copy to avoid modifying the original DataFrame passed to the function
+        df_copy = df.copy()
 
-            # count the number of duplicates
-            num_duplicates = df_all_trades.duplicated(subset=['tx_hash']).sum()
-            print(f"Number of duplicate tx_hash values in the concatenated dataframe: {num_duplicates}")
-            print(f"Printing first 10 duplicates...")
-            print(df_all_trades[df_all_trades.duplicated(subset=['tx_hash'])].head(10))
+        # --- Step 1: Ensure 'trade_timestamp' is datetime ---
+        # Check if the column is already a datetime type
+        if not pd.api.types.is_datetime64_any_dtype(df_copy['trade_timestamp']):
+            print("Converting 'trade_timestamp' to datetime format...")
+            # Attempt conversion, trying numeric (assuming seconds) then standard strings
+            try:
+                # Try numeric conversion first (e.g., Unix timestamp in seconds)
+                df_copy['trade_timestamp'] = pd.to_datetime(df_copy['trade_timestamp'], unit='s', errors='raise')
+                print("Successfully converted from Unix timestamp (seconds).")
+            except (ValueError, TypeError, OverflowError):
+                # If numeric fails, try standard datetime string conversion
+                print("Unix timestamp conversion failed or not applicable, trying standard datetime string conversion...")
+                try:
+                    df_copy['trade_timestamp'] = pd.to_datetime(df_copy['trade_timestamp'], errors='raise')
+                    print("Successfully converted from datetime string.")
+                except Exception as dt_err:
+                    raise ValueError(f"Failed to convert 'trade_timestamp' to datetime. Original error: {dt_err}")
 
-            # add a duplicate flag column to the concatenated dataframe
-            print("\nDropping duplicates, keeping the row where resets == True from the concatenated dataframe...")
-            # sort the dataframe by tx_hash and trade_timestamp ascending, then resets descending
-            df_all_trades.sort_values(by=['tx_hash', 'trade_timestamp', 'resets'], ascending=[True, True, False], inplace=True)
-            # drop duplicates, where resets == False
-            df_all_trades.drop_duplicates(subset=['tx_hash'], keep='first', inplace=True)
+        # Check for NaT (Not a Time) values after conversion
+        if df_copy['trade_timestamp'].isnull().any():
+            raise ValueError("Found null values in 'trade_timestamp' after conversion. Please check data.")
 
-            # confirm the duplicates have been dropped
-            if df_all_trades.duplicated(subset=['tx_hash']).any():
-                raise ValueError("Duplicates where resets == False have not been dropped. Exiting...")
+        # --- Step 2: Sort by trade_timestamp ---
+        print("Sorting DataFrame by 'trade_timestamp'...")
+        # ignore_index=True resets the index after sorting, which is often cleaner,
+        # but we need the original index to map results back, so we keep the original index.
+        df_copy = df_copy.sort_values(by='trade_timestamp', ascending=True)
 
-            print("*********************************************************************************\n")
+        # --- Step 3: Initialize the new column ---
+        df_copy['minutes_since_last_reset'] = np.nan
+
+        # --- Step 4: Filter rows where 'resets' is True ---
+        # Ensure 'resets' is boolean, coerce if necessary (e.g., if it's 0/1)
+        if not pd.api.types.is_bool_dtype(df_copy['resets']):
+             print("Warning: 'resets' column is not boolean. Attempting to coerce.")
+             try:
+                 df_copy['resets'] = df_copy['resets'].astype(bool)
+             except Exception as bool_err:
+                 raise TypeError(f"Could not convert 'resets' column to boolean: {bool_err}")
+
+        reset_rows = df_copy[df_copy['resets']].copy() # Use .copy() to avoid potential SettingWithCopyWarning
+
+        # --- Step 5 & 6: Calculate difference and convert to minutes ---
+        if not reset_rows.empty:
+            print(f"Found {len(reset_rows)} reset points. Calculating time differences...")
+
+            # Calculate the time difference between consecutive reset timestamps in the filtered subset
+            # .diff() calculates the difference between the current row and the previous row
+            time_diff = reset_rows['trade_timestamp'].diff() # This Series keeps the original index from df_copy
+
+            # Convert the time difference (Timedelta object) to total minutes
+            # .dt.total_seconds() gives float seconds, divide by 60 for minutes
+            minutes_diff = time_diff.dt.total_seconds() / 60
+
+            # --- Step 7: Assign results back to the original DataFrame copy ---
+            # Use .loc with the index from 'minutes_diff' (which matches the reset rows in df_copy)
+            # This assigns the calculated minutes to the 'minutes_since_last_reset' column
+            # ONLY for the rows where 'resets' was True. The first reset row gets NaN from .diff().
+            df_copy.loc[minutes_diff.index, 'minutes_since_last_reset'] = minutes_diff
+
+            print("Finished calculating the number of minutes between resets.")
+            return df_copy
         else:
-            print("No duplicates found in the concatenated dataframe.")
+            print("No rows found where 'resets' is True. Returning DataFrame with 'minutes_since_last_reset' column initialized to NaN.")
+            # Return the df_copy even if no resets, it will have the NaN column
+            return df_copy
 
     except Exception as e:
-        print(f"An unexpected error occurred: {type(e).__name__} - {e}")
-        raise # program stops
-
-    # count the number of trades between resets
-    try:
-        print("\nCalculating the number of trades between resets..")
-        df_trades_with_reset_counts = calculate_trades_between_resets(df_all_trades)
-    except ValueError as ve:
-        print(f"Input Data Error for calculate_trades_between_resets function: {ve}")
-        raise # program stops
-    except Exception as e:
-        print(f"An unexpected error occurred: {type(e).__name__} - {e}")
-        raise # program stops
-
-    if df_trades_with_reset_counts is not None:
-
-        # print the first 5 rows of the dataframe
-        print(f"\nConcatenated dataframe - all trades - with rows since last reset:")
-        print(df_trades_with_reset_counts.head(5))
-        print(df_trades_with_reset_counts.info())
-
-        # capture the date range of the concatenated trades dataframe
-        all_trades_date_begin = df_trades_with_reset_counts['trade_timestamp'].min()
-        all_trades_date_end = df_trades_with_reset_counts['trade_timestamp'].max()
-        print(f"\nDate range of all trades dataframe: {all_trades_date_begin} to {all_trades_date_end}")
-
-        return df_trades_with_reset_counts
-
-    else:
-        print("\nNo resets found in the concatenated trades dataframe.")
-        return None
+        print(f"An error occurred during calculation: {e}")
+        # Optionally print traceback for debugging
+        # import traceback
+        # print(traceback.format_exc())
+        return None # Indicate failure

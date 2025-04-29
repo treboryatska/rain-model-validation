@@ -6,7 +6,7 @@ import datetime
 
 def execute_query(url, query, variables=None):
     """Sends the GraphQL query to the specified URL and returns the JSON response."""
-    
+
     # Set the headers
     headers = {"Content-Type": "application/json"}
     # Prepare the payload
@@ -15,7 +15,7 @@ def execute_query(url, query, variables=None):
     if variables:
         json_payload["variables"] = variables # Add variables dictionary to payload
 
-    print(f"\nSending query to: {url} \nVariables: {variables}\n")
+    print(f"\nSending query to: {url} \nVariables: {json.dumps(variables, indent=2)}\n") # Use json.dumps for better readability
     try:
         # Make the POST request
         response = requests.post(url, headers=headers, json=json_payload, timeout=60)
@@ -43,33 +43,48 @@ def execute_query(url, query, variables=None):
         return None
 
 def fetch_trades_for_order(subgraph_url, graphql_query, target_order_hash, start_date_str, end_date_str):
-    """Fetches all trades for a specific order using pagination."""
+    """
+    Fetches all trades for a specific order using pagination, including trades
+    on both the start and end dates.
+    """
 
+    # --- Timestamp Calculation ---
+    # Calculate start timestamp (inclusive start of the day)
     start_dt_utc = datetime.datetime.strptime(start_date_str, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
     start_timestamp_inclusive = int(start_dt_utc.timestamp())
+
+    # Calculate end timestamp (exclusive start of the *next* day to include the end date)
     end_dt_utc = datetime.datetime.strptime(end_date_str, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
-    end_timestamp_exclusive = int(end_dt_utc.timestamp())
-    
+    # Add one day to the end date to get the start of the next day
+    end_dt_exclusive_utc = end_dt_utc + datetime.timedelta(days=1)
+    end_timestamp_exclusive_upper_bound = int(end_dt_exclusive_utc.timestamp())
+    # --- End Timestamp Calculation ---
+
     # define the page size
     page_size = 100
 
     # begin pagination loop
     all_trades_rows = []
-    current_last_timestamp = end_timestamp_exclusive
+    # Initialize the timestamp for the first page fetch.
+    # We want trades *before* this timestamp in descending order pagination.
+    current_last_timestamp = end_timestamp_exclusive_upper_bound
     fetch_more = True
 
-    print(f"\nFetching trades for order {target_order_hash} \nBetween dates: {start_date_str} (star timestamp: {start_timestamp_inclusive}) and {end_date_str} (end timestamp: {end_timestamp_exclusive}) exclusive\n")
+    # Update print statement for clarity on the inclusive range
+    print(f"\nFetching trades for order {target_order_hash}")
+    print(f"Between dates: {start_date_str} (inclusive) and {end_date_str} (inclusive)")
+    print(f"Using timestamp range: >= {start_timestamp_inclusive} and < {end_timestamp_exclusive_upper_bound}\n")
+
 
     while fetch_more:
-        print(f"Querying for trades before timestamp: {current_last_timestamp} \n")
+        print(f"Querying for trades >= {start_timestamp_inclusive} and < {current_last_timestamp}")
 
         # Prepare variables for the current query page
         variables = {
             "orderHash": target_order_hash,
-            "startTs": start_timestamp_inclusive,
-            "endTs": end_timestamp_exclusive,
+            "startTs": start_timestamp_inclusive,         # Lower bound (inclusive)
             "pageSize": page_size,
-            "lastTs": current_last_timestamp # Use the timestamp from the last item of the previous batch
+            "lastTs": current_last_timestamp              # Upper bound for this page (exclusive)
         }
 
         # Execute the query and print the results
@@ -82,14 +97,15 @@ def fetch_trades_for_order(subgraph_url, graphql_query, target_order_hash, start
                 print("GraphQL Errors:", json.dumps(query_result["errors"], indent=2))
             fetch_more = False
             break # Exit the loop on error or no data
-        
+
         # Process successful query result
         orders_data = query_result["data"].get("orders", [])
         if not orders_data:
-            print("No order found matching the hash (should not happen if hash is correct). Stopping.")
+            # This might happen if the orderHash exists but has no trades in the time range
+            print("No order found matching the hash OR no trades within the specified time range.")
             fetch_more = False
             break
-        
+
         # Assuming only one order matches the hash
         order_data = orders_data[0]
         order_hash = order_data.get("orderHash")
@@ -98,18 +114,25 @@ def fetch_trades_for_order(subgraph_url, graphql_query, target_order_hash, start
         print(f"Received {len(trades_batch)} trades in this batch.")
 
         if not trades_batch:
-            # No more trades match the criteria
+            # No more trades match the criteria for this pagination step
             fetch_more = False
-            print("No more trades match the criteria. Exiting loop.")
-            break # Exit loop - all data fetched
-        
+            print("No more trades match the criteria in this page. Exiting loop.")
+            break # Exit loop - all data fetched or no trades left in range
+
         # Process this batch of trades and add to our list
         for trade in trades_batch:
+            # --- Data Extraction (ensure keys exist) ---
             input_change = trade.get("inputVaultBalanceChange", {})
-            input_token_info = input_change.get("vault", {}).get("token", {})
+            input_vault = input_change.get("vault", {})
+            input_token_info = input_vault.get("token", {})
+
             output_change = trade.get("outputVaultBalanceChange", {})
-            output_token_info = output_change.get("vault", {}).get("token", {})
-            transaction_info = trade.get("tradeEvent", {}).get("transaction", {})
+            output_vault = output_change.get("vault", {})
+            output_token_info = output_vault.get("token", {})
+
+            trade_event = trade.get("tradeEvent", {})
+            transaction_info = trade_event.get("transaction", {})
+            # --- End Data Extraction ---
 
             row_data = {
                 "order_hash": order_hash,
@@ -118,12 +141,12 @@ def fetch_trades_for_order(subgraph_url, graphql_query, target_order_hash, start
                 "trade_id": trade.get("id"), # Trade ID
                 "trade_timestamp": trade.get("timestamp"), # Keep as string initially
                 "input_token": input_token_info.get("symbol"),
-                "input_decimals": input_token_info.get("decimals"), # Added decimals
+                "input_decimals": input_token_info.get("decimals"),
                 "input_amount": input_change.get("amount"),
                 "input_old_vault_balance": input_change.get("oldVaultBalance"),
                 "input_new_vault_balance": input_change.get("newVaultBalance"),
                 "output_token": output_token_info.get("symbol"),
-                "output_decimals": output_token_info.get("decimals"), # Added decimals
+                "output_decimals": output_token_info.get("decimals"),
                 "output_amount": output_change.get("amount"),
                 "output_old_vault_balance": output_change.get("oldVaultBalance"),
                 "output_new_vault_balance": output_change.get("newVaultBalance"),
@@ -135,11 +158,18 @@ def fetch_trades_for_order(subgraph_url, graphql_query, target_order_hash, start
         # Convert to int for the next query's 'where' clause
         current_last_timestamp = int(trades_batch[-1]['timestamp'])
 
+        # Sanity check: Ensure we don't accidentally go below the start timestamp
+        if current_last_timestamp < start_timestamp_inclusive:
+             print("Pagination timestamp went below start timestamp. Stopping.")
+             fetch_more = False
+             break
+
         # Optimization: Check if we received fewer items than requested size
         if len(trades_batch) < page_size:
-            print("Received fewer items than page size, assuming end of data.")
+            print("Received fewer items than page size, assuming end of data for this range.")
             fetch_more = False # Exit loop after processing this last batch
         else:
+            # Optional: Add a small delay to avoid rate limiting
             print("Waiting briefly before next request...")
             time.sleep(0.5) # 500 milliseconds
 
@@ -149,16 +179,19 @@ def fetch_trades_for_order(subgraph_url, graphql_query, target_order_hash, start
     if all_trades_rows:
         df = pd.DataFrame(all_trades_rows)
 
+        # Define desired column order
         desired_columns_order = [
             "order_hash", "block_number", "tx_hash", "trade_id", "trade_timestamp",
             "input_token", "input_decimals", "input_amount", "input_old_vault_balance", "input_new_vault_balance",
             "output_token", "output_decimals", "output_amount", "output_old_vault_balance", "output_new_vault_balance"
         ]
+        # Reindex, adding missing columns as NaN if necessary
         df = df.reindex(columns=desired_columns_order)
 
-        # print sample columns of the dataframe
         print("\nCreated DataFrame:")
-        print(df[["order_hash", "block_number", "tx_hash", "input_token", "output_token"]].head(5).to_string())
+        # Print sample columns, handle potential missing columns gracefully
+        cols_to_print = ["order_hash", "block_number", "tx_hash", "trade_timestamp", "input_token", "output_token"]
+        print(df[[col for col in cols_to_print if col in df.columns]].head(5).to_string())
         df.info()
 
         # Convert relevant columns to numeric types
@@ -166,15 +199,17 @@ def fetch_trades_for_order(subgraph_url, graphql_query, target_order_hash, start
         numeric_cols = [
             'trade_timestamp', # Convert timestamp too
             'input_decimals', 'input_amount', 'input_old_vault_balance', 'input_new_vault_balance',
-            'output_decimals', 'output_amount', 'output_old_vault_balance', 'output_new_vault_balance'
+            'output_decimals', 'output_amount', 'output_old_vault_balance', 'output_new_vault_balance',
+            'block_number' # Also convert block number
         ]
-        # block_number can also be converted if needed
-        # df['block_number'] = pd.to_numeric(df['block_number'], errors='coerce').astype('Int64') # Use nullable Int
 
         for col in numeric_cols:
             if col in df.columns:
-                # Convert large numbers potentially needing float or object for very large ints
+                # Use errors='coerce' to turn conversion errors into NaT/NaN
                 df[col] = pd.to_numeric(df[col], errors='coerce')
+                # Optionally cast block_number and decimals to nullable integers if appropriate
+                # if col in ['block_number', 'input_decimals', 'output_decimals']:
+                #     df[col] = df[col].astype('Int64') # Use pandas nullable integer type
 
         print("\nDataFrame Info after numeric conversion:")
         df.info()
@@ -183,19 +218,23 @@ def fetch_trades_for_order(subgraph_url, graphql_query, target_order_hash, start
         return df
     else:
         print("\nNo trades found or retrieved.")
-        return None
+        return pd.DataFrame(columns=desired_columns_order) # Return empty DataFrame with correct columns
 
 # get the trade info
 def get_trades(trade_hash, url, start_date_str, end_date_str):
+    """
+    Sets up and calls the fetch_trades_for_order function.
+    """
 
-    # define the GraphQL Query
+    # Define the GraphQL Query - Removed unused $endTs variable definition
+    # $startTs is the overall inclusive start timestamp
+    # $lastTs is the exclusive upper bound timestamp for the current page fetch
     graphql_query = """
     query strategyTrades(
         $orderHash: ID!,
         $startTs: BigInt!,
-        $endTs: BigInt!,
         $pageSize: Int!,
-        $lastTs: BigInt  # Nullable: Timestamp of the last item from the previous page
+        $lastTs: BigInt
     ) {
         orders(where: {orderHash: $orderHash}) {
         orderHash
@@ -203,6 +242,7 @@ def get_trades(trade_hash, url, start_date_str, end_date_str):
             first: $pageSize,
             orderBy: timestamp,
             orderDirection: desc,
+            # Filters trades >= startTs AND < lastTs for the current page
             where: { timestamp_gte: $startTs, timestamp_lt: $lastTs }
             ) {
             id
@@ -229,16 +269,18 @@ def get_trades(trade_hash, url, start_date_str, end_date_str):
 
     # get the trades dataframe
     try:
-        
+        print(f"Initiating trade fetch for hash: {trade_hash}")
         df_trades = fetch_trades_for_order(
-            url, 
-            graphql_query, 
-            trade_hash, 
+            url,
+            graphql_query,
+            trade_hash,
             start_date_str,
             end_date_str
         )
-        
         return df_trades
     except Exception as e:
-        print(f"Error: {e}")
+        # Log the exception with traceback for better debugging if needed
+        import traceback
+        print(f"An unexpected error occurred in get_trades: {e}")
+        print(traceback.format_exc())
         return None

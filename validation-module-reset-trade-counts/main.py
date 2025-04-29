@@ -5,7 +5,8 @@ from orders import get_order_info
 from trades import get_trades
 from resets import (
     add_resets_column, 
-    concatenate_strategy_trades_with_market_trades
+    calculate_trades_between_resets,
+    calculate_minutes_between_resets
 )
 from check import (
     check_model_output_file_columns, 
@@ -28,21 +29,21 @@ print("#########################################################################
 
 # define the location of the actual model output file
 # connect to google sheets to get the model output file
-model_input_file_path = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzY4ojDhxerTo5bEaShVSXK1bDx-QBx5wwJTI2EQDegjNiE48u-a_XhDUvNHa6x_s-pZ4BMR83k3i3/pub?gid=634861611&single=true&output=csv"
-model_output_file_path = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTzY4ojDhxerTo5bEaShVSXK1bDx-QBx5wwJTI2EQDegjNiE48u-a_XhDUvNHa6x_s-pZ4BMR83k3i3/pub?gid=2118869616&single=true&output=csv"
+model_input_file_path = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTVA_vs84frj7bFwANYpHuTYhZM-tMtIuCODegEI72lHmIVAi1cHIQxGWFjNYCd3DCuVczbmIeZ1pdk/pub?gid=634861611&single=true&output=csv"
+model_output_file_path = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTVA_vs84frj7bFwANYpHuTYhZM-tMtIuCODegEI72lHmIVAi1cHIQxGWFjNYCd3DCuVczbmIeZ1pdk/pub?gid=1770369092&single=true&output=csv"
 
 # Define the network
 # current options are: flare, base, polygon, arbitrum, bsc, linea, ethereum
 # note, this is the network the order was made on
-network = "base"
+network = "flare"
 
 # Define query parameters/variables
-target_order_hash = "0xbdffe74d38286fe9182c52e79161ed9d87e71a5133c34c069b2e3e541a74f9df"
+target_order_hash = "0x4e3e14e0cfa2efc8f5f1249f13aa4fa63ff4f0b8285f2b9d56b161ec8ca9c6c1"
 
 # define the start and end timestamps
 # format: %Y-%m-%d
-start_date_str = "2024-10-31"
-end_date_str = "2025-04-17"
+start_date_str = "2024-10-01"
+end_date_str = "2024-11-07"
 
 # get the Subgraph Endpoint URL
 subgraph_url = subgraph_urls[network]
@@ -98,6 +99,12 @@ if df_trades is not None:
 
         # add the resets column to the df
         df_trades_resets = add_resets_column(df_input_slice)
+
+        # calculate the number of trades between resets
+        df_trades_resets = calculate_trades_between_resets(df_trades_resets)
+
+        # calculate the number of minutes between resets
+        df_trades_resets = calculate_minutes_between_resets(df_trades_resets)
 
         if df_trades_resets is None:
             print("Warning: df_trades_resets is None")
@@ -244,16 +251,16 @@ print("\n--------------------------------\nGetting model output data\n----------
 
 # get the model output file and check it is valid
 # the model output data must start at row 23
-# if the model output file does not contain the date/time and trade_count_in_reset columns, raise an error
+# if the model output file does not contain the date/time and auction_count_in_reset columns, raise an error
 df_model = pd.read_csv(model_output_file_path, skiprows=rows_to_skip)
 if df_model is None:
     raise ValueError("Model output file is not valid")
 
-# check the model output file contains the date/time and trade_count_in_reset columns
+# check the model output file contains the date/time and auction_count_in_reset columns
 if not check_model_output_file_columns(model_output_file_path, df_model):
-    raise ValueError("Model output file does not contain the date/time and trade_count_in_reset columns")
+    raise ValueError("Model output file does not contain the date/time and auction_count_in_reset columns")
 
-# get the datetime and trade_count_in_reset between resets from the model file
+# get the datetime and auction_count_in_reset between resets from the model file
 try: 
     # clean the model file
     print(f"cleaning model output data file...")
@@ -319,51 +326,31 @@ print("\n--------------------------------\nFinished getting model output data\n-
 # end of get model output data
 # #####################################################################################
 
-# #####################################################################################
-# concatenate model input data with strategy trades
-# #####################################################################################
-print("\n--------------------------------\nConcatenating model input data with strategy trades\n--------------------------------\n")
-
-# concatenate the two dataframes - keep only the tx_hash and trade_count_in_reset columns
-df_all_trades = concatenate_strategy_trades_with_market_trades(df_trades_resets, df_market_trades_clean)
-
-if df_all_trades is None:
-    raise ValueError("df_all_trades is None. Exiting...")
-
-# print info about df_all_trades
-print("\ndf_all_trades")
-print(df_all_trades.info())
-print(df_all_trades.head())
-
-print("\n--------------------------------\nFinished concatenating model input data with strategy trades\n--------------------------------\n\n")
-# #####################################################################################
-# end of concatenate model input data with strategy trades
-# #####################################################################################
-
 
 # #####################################################################################
-# run tests on modeled trade count between resets and actual trade count between resets
+# get basic stats for modeled trade count between resets and actual trade count between resets
 # #####################################################################################
-print("\n--------------------------------\nRunning tests on modeled trade count between resets and actual trade count between resets\n--------------------------------\n")
+print("\n--------------------------------\Getting basic stats for modeled trade count between resets and actual trade count between resets\n--------------------------------\n")
 
 # confirm dates in both dataframes
 # check if both dataframes exist 
 if df_model_trade_count_in_reset is None:
     raise ValueError("df_model_trade_count_in_reset is None. Exiting...")
-if df_all_trades is None:
-    raise ValueError("df_all_trades is None. Exiting...")
+if df_trades_resets is None:
+    raise ValueError("df_trades_resets is None. Exiting...")
 
-# print the start date of the strategy, and thedate range of both dataframes
-print(f"strategy start datetime: {strategy_start_datetime}")
+# print the start date of the strategy, and the date range of both dataframes
+print("check date ranges of both actual and modeled results:")
+print(f"strategy start datetime (timestampAdded field from the orders subgraph): {strategy_start_datetime}")
 print(f"the date of the first trade in the strategy: {strategy_trades_date_begin}")
+print(f"the date of the first auction in the model outputs: {df_model_trade_count_in_reset['datetime'].min()}")
 print(f"the date of the last trade in the strategy: {strategy_trades_date_end}")
-print(f"Date range of modeled outputs data: {df_model_trade_count_in_reset['datetime'].min()} to {df_model_trade_count_in_reset['datetime'].max()}")
-print(f"Date range of the concatenated strategy trades and market trades data: {df_all_trades['trade_timestamp'].min()} to {df_all_trades['trade_timestamp'].max()}")
+print(f"the date of the last auction in the model outputs: {df_model_trade_count_in_reset['datetime'].max()}\n")
 
 # get the basic stats
-strategy_basic_stats = basic_stats(df_trades_resets, df_all_trades, df_market_trades_clean, df_model_trade_count_in_reset)
+strategy_basic_stats = basic_stats(df_trades_resets, df_market_trades_clean, df_model_trade_count_in_reset)
 
-print("\n--------------------------------\nFinished running tests on modeled trade count between resets and actual trade count between resets\n--------------------------------\n")
+print("\n--------------------------------\nFinished getting basic stats for modeled trade count between resets and actual trade count between resets\n--------------------------------\n")
 # #####################################################################################
-# end of run tests on modeled trade count between resets and actual trade count between resets
+# end of get basic stats for modeled trade count between resets and actual trade count between resets
 # #####################################################################################

@@ -7,7 +7,8 @@ from orders import get_order_info
 from trades import get_trades
 from resets import (
     add_resets_column, 
-    concatenate_strategy_trades_with_market_trades
+    calculate_trades_between_resets,
+    calculate_minutes_between_resets
 )
 from check import (
     check_model_output_file_columns, 
@@ -29,9 +30,8 @@ orders = get_sample_dataset(batch_sample_url)
 
 # model list
 model_list = {
-    "m15_test": "model_test15m_url",
-    "m30": "model_30m_url",
     "m15": "model_15m_url",
+    "m30": "model_30m_url",
     "m60": "model_60m_url",
     "m90": "model_90m_url"
 }
@@ -113,6 +113,12 @@ for model in model_list:
 
                 # add the resets column to the df
                 df_trades_resets = add_resets_column(df_input_slice)
+
+                # calculate the number of trades between resets
+                df_trades_resets = calculate_trades_between_resets(df_trades_resets)
+
+                # calculate the number of minutes between resets
+                df_trades_resets = calculate_minutes_between_resets(df_trades_resets)
 
                 if df_trades_resets is None:
                     print("Warning: df_trades_resets is None")
@@ -333,51 +339,31 @@ for model in model_list:
         # #####################################################################################
 
         # #####################################################################################
-        # concatenate model input data with strategy trades
+        # get basic stats for modeled trade count between resets and actual trade count between resets
         # #####################################################################################
-        print("\n--------------------------------\nConcatenating model input data with strategy trades\n--------------------------------\n")
-
-        # concatenate the two dataframes - keep only the tx_hash and trade_count_in_reset columns
-        df_all_trades = concatenate_strategy_trades_with_market_trades(df_trades_resets, df_market_trades_clean)
-
-        if df_all_trades is None:
-            raise ValueError("df_all_trades is None. Exiting...")
-        
-        # print info about df_all_trades
-        print("\ndf_all_trades")
-        print(df_all_trades.info())
-        print(df_all_trades.head())
-
-        print("\n--------------------------------\nFinished concatenating model input data with strategy trades\n--------------------------------\n\n")
-        # #####################################################################################
-        # end of concatenate model input data with strategy trades
-        # #####################################################################################
-
-        # #####################################################################################
-        # run tests on modeled trade count between resets and actual trade count between resets
-        # #####################################################################################
-        print("\n--------------------------------\nRunning tests on modeled trade count between resets and actual trade count between resets\n--------------------------------\n")
+        print("\n--------------------------------\Getting basic stats for modeled trade count between resets and actual trade count between resets\n--------------------------------\n")
 
         # confirm dates in both dataframes
         # check if both dataframes exist 
         if df_model_trade_count_in_reset is None:
             raise ValueError("df_model_trade_count_in_reset is None. Exiting...")
-        if df_all_trades is None:
-            raise ValueError("df_all_trades is None. Exiting...")
+        if df_trades_resets is None:
+            raise ValueError("df_trades_resets is None. Exiting...")
 
-        # print the start date of the strategy, and thedate range of both dataframes
-        print(f"strategy start datetime: {strategy_start_datetime}")
+        # print the start date of the strategy, and the date range of both dataframes
+        print("check date ranges of both actual and modeled results:")
+        print(f"strategy start datetime (timestampAdded field from the orders subgraph): {strategy_start_datetime}")
         print(f"the date of the first trade in the strategy: {strategy_trades_date_begin}")
+        print(f"the date of the first auction in the model outputs: {df_model_trade_count_in_reset['datetime'].min()}")
         print(f"the date of the last trade in the strategy: {strategy_trades_date_end}")
-        print(f"Date range of modeled outputs data: {df_model_trade_count_in_reset['datetime'].min()} to {df_model_trade_count_in_reset['datetime'].max()}")
-        print(f"Date range of the concatenated strategy trades and market trades data: {df_all_trades['trade_timestamp'].min()} to {df_all_trades['trade_timestamp'].max()}")
+        print(f"the date of the last auction in the model outputs: {df_model_trade_count_in_reset['datetime'].max()}\n")
 
         # get the basic stats
-        strategy_basic_stats = basic_stats(df_trades_resets, df_all_trades, df_market_trades_clean, df_model_trade_count_in_reset)
+        strategy_basic_stats = basic_stats(df_trades_resets, df_market_trades_clean, df_model_trade_count_in_reset)
 
-        print("\n--------------------------------\nFinished running tests on modeled trade count between resets and actual trade count between resets\n--------------------------------\n")
+        print("\n--------------------------------\nFinished getting basic stats for modeled trade count between resets and actual trade count between resets\n--------------------------------\n")
         # #####################################################################################
-        # end of run tests on modeled trade count between resets and actual trade count between resets
+        # end of get basic stats for modeled trade count between resets and actual trade count between resets
         # #####################################################################################
 
         # construct the validation outputs

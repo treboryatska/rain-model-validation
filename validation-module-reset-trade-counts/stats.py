@@ -8,7 +8,7 @@ from scipy.stats import wilcoxon
 # tests:
 # 1) 
 
-def basic_stats(df_trades_resets, df_all_trades, df_market_trades_clean, df_model_trade_count_in_reset):
+def basic_stats(df_trades_resets, df_market_trades_clean, df_model_trade_count_in_reset):
     # get the variables, add them to a dictionary, and return the dictionary
     # set model outputs to zero if null, but not for actuals. Reasoning: we want to know if actuals are returning nulls. 
     # Model outputs are volitile at this stage, and nulls are likely extreme results. 
@@ -17,20 +17,24 @@ def basic_stats(df_trades_resets, df_all_trades, df_market_trades_clean, df_mode
     # trade counts
     model_input_trade_count = df_market_trades_clean['tx_hash'].count()
     strategy_trade_count = df_trades_resets['tx_hash'].count()
+    model_output_auction_count = df_model_trade_count_in_reset.shape[0]
     # reset counts
-    model_output_reset_count = df_model_trade_count_in_reset['trade_count_in_reset'].count() # count will result in zero if no resets found
-    actual_reset_count = df_all_trades['resets'].sum()
+    model_output_reset_count = df_model_trade_count_in_reset['auction_count_in_reset'].count() # count will result in zero if no resets found
+    actual_reset_count = df_trades_resets['resets'].sum()
+    # calculate the median and average minutes between resets in the actual data
+    actual_median_minutes_between_resets = df_trades_resets['minutes_since_last_reset'].dropna().median()
+    actual_average_minutes_between_resets = df_trades_resets['minutes_since_last_reset'].dropna().mean()
     # median and average trade count between resets
-    model_output_median_trade_count_between_resets = df_model_trade_count_in_reset['trade_count_in_reset'].dropna().median()
+    model_output_median_trade_count_between_resets = df_model_trade_count_in_reset['auction_count_in_reset'].dropna().median()
     model_output_median_trade_count_between_resets = 0 if pd.isna(model_output_median_trade_count_between_resets) else model_output_median_trade_count_between_resets
-    actual_median_trade_count_between_resets = df_all_trades['rows_since_last_reset'][df_all_trades['resets'] == True].median()
-    model_output_average_trade_count_between_resets = df_model_trade_count_in_reset['trade_count_in_reset'].dropna().mean()
+    actual_median_trade_count_between_resets = df_trades_resets['rows_since_last_reset'][df_trades_resets['resets'] == True].median()
+    model_output_average_trade_count_between_resets = df_model_trade_count_in_reset['auction_count_in_reset'].dropna().mean()
     model_output_average_trade_count_between_resets = 0 if pd.isna(model_output_average_trade_count_between_resets) else model_output_average_trade_count_between_resets
-    actual_average_trade_count_between_resets = df_all_trades['rows_since_last_reset'][df_all_trades['resets'] == True].mean()
+    actual_average_trade_count_between_resets = df_trades_resets['rows_since_last_reset'][df_trades_resets['resets'] == True].mean()
     # standard deviation of trade count between resets
-    model_output_std_trade_count_between_resets = df_model_trade_count_in_reset['trade_count_in_reset'].dropna().std()
+    model_output_std_trade_count_between_resets = df_model_trade_count_in_reset['auction_count_in_reset'].dropna().std()
     model_output_std_trade_count_between_resets = 0 if pd.isna(model_output_std_trade_count_between_resets) else model_output_std_trade_count_between_resets
-    actual_std_trade_count_between_resets = df_all_trades['rows_since_last_reset'][df_all_trades['resets'] == True].std()
+    actual_std_trade_count_between_resets = df_trades_resets['rows_since_last_reset'][df_trades_resets['resets'] == True].std()
     # difference between modeled reset count and actual reset count
     reset_count_difference_modeled_vs_actual = model_output_reset_count - actual_reset_count
     # difference between modeled and actual trade count between resets
@@ -49,8 +53,11 @@ def basic_stats(df_trades_resets, df_all_trades, df_market_trades_clean, df_mode
     strategy_basic_stats = {
         "model_input_trade_count": model_input_trade_count,
         "strategy_trade_count": strategy_trade_count,
+        "model_output_auction_count": model_output_auction_count,
         "model_output_reset_count": model_output_reset_count,
         "actual_reset_count": actual_reset_count,
+        "actual_median_minutes_between_resets": actual_median_minutes_between_resets,
+        "actual_average_minutes_between_resets": actual_average_minutes_between_resets,
         "model_output_median_trade_count_between_resets": model_output_median_trade_count_between_resets,
         "actual_median_trade_count_between_resets": actual_median_trade_count_between_resets,
         "model_output_average_trade_count_between_resets": model_output_average_trade_count_between_resets,
@@ -66,22 +73,30 @@ def basic_stats(df_trades_resets, df_all_trades, df_market_trades_clean, df_mode
     }
 
     # print basic stats
-    print(f"\nTrade count of the model input file: {model_input_trade_count}")
+    print("Printing basic stats about the actual strategy data, model input data, and model output data")
+    print("\nSummary counts:")
+    print(f"Trade count of the model input file: {model_input_trade_count}")
     print(f"Trade count in strategy: {strategy_trade_count}") 
-    print(f"Number of resets in the model output file: {model_output_reset_count}")
+    print(f"Number of auctions in the model output file: {model_output_auction_count}")
     print(f"Number of resets in the strategy trades: {actual_reset_count}")
-    print(f"\nAverage number of trades between resets in the model output file: {model_output_average_trade_count_between_resets}")
+    print(f"Number of resets in the model output file: {model_output_reset_count}")
+    print("\nMinutes between resets:")
+    print(f"Average number of minutes between resets in the actual strategy data: {actual_average_minutes_between_resets}")
+    print(f"Median number of minutes between resets in the actual strategy data: {actual_median_minutes_between_resets}")
+    print("\nTrade/auction count between resets mean, median, standard deviation:")
     print(f"Average number of trades between resets in the actual strategy data: {actual_average_trade_count_between_resets}")
-    print(f"\nMedian number of trades between resets in the model output file: {model_output_median_trade_count_between_resets}")
+    print(f"Average number of auctions between resets in the model output file: {model_output_average_trade_count_between_resets}")
     print(f"Median number of trades between resets in the actual strategy data: {actual_median_trade_count_between_resets}")
-    print(f"\nStandard deviation of trade count between resets in the model output file: {model_output_std_trade_count_between_resets}")
+    print(f"Median number of auctions between resets in the model output file: {model_output_median_trade_count_between_resets}")
     print(f"Standard deviation of trade count between resets in the actual strategy data: {actual_std_trade_count_between_resets}")
-    print(f"\nDifference between modeled and actual reset count: {reset_count_difference_modeled_vs_actual}")
-    print(f"\nDifference between modeled and actual average trade count between resets: {average_trade_count_difference_modeled_vs_actual}")
-    print(f"Difference between modeled and actual median trade count between resets: {median_trade_count_difference_modeled_vs_actual}")
-    print(f"Difference between modeled and actual standard deviation of trade count between resets: {std_trade_count_difference_modeled_vs_actual}")
-    print(f"Difference between modeled and actual average trade count between resets as a percentage of model_input_trade_count: {average_trade_count_difference_modeled_vs_actual_percentage}")
-    print(f"Difference between modeled and actual median trade count between resets as a percentage of model_input_trade_count: {median_trade_count_difference_modeled_vs_actual_percentage}")
+    print(f"Standard deviation of auction count between resets in the model output file: {model_output_std_trade_count_between_resets}")
+    print("\nDifference between modeled and actual trade/auction count between resets:")
+    print(f"Difference between modeled and actual reset count: {reset_count_difference_modeled_vs_actual}")
+    print(f"Difference between modeled and actual average trade/auction count between resets: {average_trade_count_difference_modeled_vs_actual}")
+    print(f"Difference between modeled and actual median trade/auction count between resets: {median_trade_count_difference_modeled_vs_actual}")
+    print(f"Difference between modeled and actual standard deviation of trade/auction count between resets: {std_trade_count_difference_modeled_vs_actual}")
+    print(f"Difference between modeled and actual average trade/auction count between resets as a percentage of model_input_trade_count: {average_trade_count_difference_modeled_vs_actual_percentage}")
+    print(f"Difference between modeled and actual median trade/auction count between resets as a percentage of model_input_trade_count: {median_trade_count_difference_modeled_vs_actual_percentage}")
     return strategy_basic_stats
 
 # test the hypothesis: mean and median difference between modeled and actual trade count between resets is 0
