@@ -8,7 +8,7 @@ from trades import get_trades
 from resets import (
     add_resets_column, 
     calculate_trades_between_resets,
-    calculate_minutes_between_resets
+    calculate_minutes_between_executed_auctions
 )
 from check import (
     check_model_output_file_columns, 
@@ -117,8 +117,8 @@ for model in model_list:
                 # calculate the number of trades between resets
                 df_trades_resets = calculate_trades_between_resets(df_trades_resets)
 
-                # calculate the number of minutes between resets
-                df_trades_resets = calculate_minutes_between_resets(df_trades_resets)
+                # calculate the number of minutes between executed auctions
+                df_trades_resets['minutes_since_last_executed_auction'] = calculate_minutes_between_executed_auctions(df_trades_resets['trade_timestamp'])
 
                 if df_trades_resets is None:
                     print("Warning: df_trades_resets is None")

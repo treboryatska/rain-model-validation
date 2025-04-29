@@ -7,6 +7,584 @@ import seaborn as sns
 import numpy as np
 import scipy.stats as stats
 
+# line chart function
+def create_line_chart(df, x_column, y_column, category_column=None, title=None, xlabel=None, ylabel=None, ax=None, figsize=(10, 6)):
+    """
+    Creates a line chart using Seaborn, optionally colored by a categorical column.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the data.
+        x_column (str): The name of the column to use for the x-axis.
+        y_column (str): The name of the column to use for the y-axis.
+        category_column (str, optional): The name of the column to use for coloring
+                                         different lines (hue). Defaults to None.
+        title (str, optional): The title for the chart. Defaults to None.
+        xlabel (str, optional): The label for the x-axis. Defaults to x_column name.
+        ylabel (str, optional): The label for the y-axis. Defaults to y_column name.
+        ax (matplotlib.axes.Axes, optional): An existing Axes object to plot on.
+                                             If None, a new figure and axes are created.
+                                             Defaults to None.
+        figsize (tuple, optional): The size of the figure to create if ax is None.
+                                   Defaults to (10, 6).
+
+    Returns:
+        tuple: A tuple containing:
+            - fig (matplotlib.figure.Figure): The Figure object for the plot.
+            - ax (matplotlib.axes.Axes): The Axes object containing the plot.
+
+    Raises:
+        ValueError: If specified columns are not found in the DataFrame.
+        TypeError: If the input df is not a pandas DataFrame.
+    """
+    # --- Input Validation ---
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input 'df' must be a pandas DataFrame.")
+
+    required_columns = [x_column, y_column]
+    if category_column:
+        required_columns.append(category_column)
+
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns in DataFrame: {missing_columns}")
+
+    # --- Plotting ---
+    # Determine figure and axes
+    if ax is None:
+        # Create new figure and axes if none are provided
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        # If axes are provided, get the figure they belong to
+        fig = ax.figure
+
+    # Create the line plot using seaborn
+    sns.lineplot(
+        data=df,
+        x=x_column,
+        y=y_column,
+        hue=category_column, # Use category_column for hue if provided
+        ax=ax,
+        marker='o', # Optional: add markers to points
+        legend='auto' # Show legend if hue is used
+    )
+
+    # --- Styling ---
+    # Set title
+    if title:
+        ax.set_title(title, fontsize=14, fontweight='bold')
+    else:
+        # Generate a default title if none provided
+        default_title = f"{y_column} over {x_column}"
+        if category_column:
+            default_title += f" by {category_column}"
+        ax.set_title(default_title, fontsize=14, fontweight='bold')
+
+    # Set labels
+    ax.set_xlabel(xlabel if xlabel else x_column.replace('_', ' ').title(), fontsize=12)
+    ax.set_ylabel(ylabel if ylabel else y_column.replace('_', ' ').title(), fontsize=12)
+
+    # Improve readability
+    ax.tick_params(axis='x', rotation=45) # Rotate x-axis labels if needed
+    ax.grid(axis='y', linestyle='--', alpha=0.7) # Add light grid lines
+
+    # Adjust legend position if it exists
+    legend_bbox_adjust = [0, 0, 1, 1] # Default rect for tight_layout if no legend outside
+    if category_column and ax.get_legend() is not None:
+        # Place legend outside the plot area to avoid overlap
+        ax.legend(title=category_column.replace('_', ' ').title(), bbox_to_anchor=(1.05, 1), loc='upper left')
+        # Adjust layout to make room for the legend
+        legend_bbox_adjust = [0, 0, 0.80, 1] # Make right boundary smaller
+
+    # Apply tight_layout to the figure
+    # Use rect parameter to potentially leave space for legend if it's outside
+    fig.tight_layout(rect=legend_bbox_adjust)
+
+    # --- Return Figure and Axes ---
+    return fig, ax # Always return both figure and axes
+
+# Grouped vertical bar chart function
+def create_grouped_bar_chart(
+    df,
+    category_column, # x-axis
+    value_column,    # y-axis
+    group_column,    # hue (groups within each category)
+    title=None,
+    xlabel=None,
+    ylabel=None,
+    ax=None,
+    figsize=(12, 7), # Adjusted default size
+    palette="viridis",
+    add_bar_labels=True,
+    label_format='{:,.0f}',
+    xtick_rotation=45, # Default rotation for x-axis labels
+    legend_loc='upper right' # New parameter for legend location
+    ):
+    """
+    Creates a grouped vertical bar chart using Seaborn.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the data in a "long" format.
+                           (e.g., columns for category, value, and group type).
+        category_column (str): The name of the column for the x-axis (categories).
+        value_column (str): The name of the column for the y-axis (bar heights/values).
+        group_column (str): The name of the column to group by (creates different colored bars
+                            within each category).
+        title (str, optional): The title for the chart. Defaults to None.
+        xlabel (str, optional): The label for the x-axis. Defaults to category_column name.
+        ylabel (str, optional): The label for the y-axis. Defaults to value_column name.
+        ax (matplotlib.axes.Axes, optional): An existing Axes object to plot on.
+                                             If None, a new figure and axes are created.
+                                             Defaults to None.
+        figsize (tuple, optional): The size of the figure to create if ax is None.
+                                   Defaults to (12, 7).
+        palette (str or list, optional): Seaborn color palette for the bars.
+                                         Defaults to "viridis".
+        add_bar_labels (bool, optional): If True, add data labels on top of the bars.
+                                         Defaults to True.
+        label_format (str, optional): Python format string for the bar labels.
+                                      Defaults to '{:,.0f}' (comma-separated integer).
+        xtick_rotation (int, optional): Rotation angle for x-axis tick labels.
+                                        Defaults to 45. Set to 0 for no rotation.
+        legend_loc (str, optional): Location for the legend (e.g., 'best', 'upper right').
+                                    Defaults to 'upper right'. Set to None to hide legend.
+
+    Returns:
+        tuple: A tuple containing:
+            - fig (matplotlib.figure.Figure): The Figure object for the plot.
+            - ax (matplotlib.axes.Axes): The Axes object containing the plot.
+
+    Raises:
+        ValueError: If specified columns are not found in the DataFrame or if data is unsuitable.
+        TypeError: If the input df is not a pandas DataFrame.
+    """
+    # --- Input Validation ---
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input 'df' must be a pandas DataFrame.")
+
+    required_columns = [category_column, value_column, group_column]
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns in DataFrame: {missing_columns}")
+
+    # Check if value column is numeric
+    if not pd.api.types.is_numeric_dtype(df[value_column]):
+         # try to coerce the value column to a numeric type
+         try:
+             df[value_column] = pd.to_numeric(df[value_column], errors='coerce')
+         except Exception as e:
+             raise ValueError(f"Value column '{value_column}' must be numeric. Error: {e}")
+
+    # Check if data exists
+    if df.empty:
+        raise ValueError("Input DataFrame 'df' is empty.")
+
+    # --- Data Preparation ---
+    # Create a copy to avoid modifying the original DataFrame
+    plot_df = df.copy()
+
+    # --- Plotting ---
+    # Determine figure and axes
+    if ax is None:
+        # Create new figure and axes if none are provided
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        # If axes are provided, get the figure they belong to
+        fig = ax.figure
+
+    # Create the grouped vertical bar plot using seaborn
+    barplot = sns.barplot( # Assign the barplot to a variable
+        data=plot_df,
+        x=category_column, # Categories on x-axis
+        y=value_column,    # Values on y-axis
+        hue=group_column,  # Grouping variable
+        palette=palette,   # Apply color palette
+        ax=ax,
+        errorbar=None      # *** Turn off confidence interval lines/error bars ***
+    )
+
+    # --- Styling ---
+    # Set title
+    if title:
+        ax.set_title(title, fontsize=14, fontweight='bold')
+    else:
+        # Generate a default title if none provided
+        default_title = f"{value_column} by {category_column}, Grouped by {group_column}"
+        ax.set_title(default_title, fontsize=14, fontweight='bold')
+
+    # Set labels
+    ax.set_xlabel(xlabel if xlabel else category_column.replace('_', ' ').title(), fontsize=12)
+    ax.set_ylabel(ylabel if ylabel else value_column.replace('_', ' ').title(), fontsize=12)
+
+    # Improve readability
+    ax.grid(axis='y', linestyle='--', alpha=0.7) # Add horizontal grid lines
+    sns.despine(ax=ax) # Remove top and right spines
+
+    # Rotate x-axis labels
+    if xtick_rotation is not None and xtick_rotation != 0:
+        ax.tick_params(axis='x', rotation=xtick_rotation)
+
+    # Adjust legend position
+    if legend_loc and ax.get_legend() is not None:
+        # Place legend inside using specified location
+        ax.legend(title=group_column.replace('_', ' ').title(), loc=legend_loc)
+    elif ax.get_legend() is not None:
+         # Remove legend if legend_loc is None or False
+         ax.get_legend().remove()
+
+
+    # --- Add Bar Labels ---
+    if add_bar_labels:
+        # Iterate through the containers (groups of bars) in the Axes object
+        for container in ax.containers:
+            ax.bar_label(
+                container,
+                fmt=label_format, # Apply user-defined format
+                padding=3,        # Add some padding between bar and label
+                fontsize=8        # Adjust font size (often needs to be smaller for grouped)
+                # rotation=90    # Optional: rotate labels if they overlap
+            )
+        # Optional: Adjust y-axis limits slightly to make room for labels on tallest bars
+        current_ylim = ax.get_ylim()
+        # Ensure bottom limit is not negative if data is non-negative
+        bottom_lim = 0 if current_ylim[0] >= 0 and plot_df[value_column].min() >= 0 else current_ylim[0]
+        new_ylim_upper = current_ylim[1] * 1.08 # Increase upper limit by 8%
+        ax.set_ylim(bottom=bottom_lim, top=new_ylim_upper)
+
+
+    # Apply tight_layout AFTER potentially adjusting legend and limits
+    fig.tight_layout()
+
+    # --- Return Figure and Axes ---
+    return fig, ax # Always return both figure and axes
+
+# Faceted grouped vertical bar chart function
+def create_faceted_grouped_bar_chart(
+    df,
+    category_column, # x-axis within each facet
+    value_column,    # y-axis within each facet
+    group_column,    # hue (groups within each category)
+    facet_column,    # Column to create facets (subplots) by
+    facet_wrap=None, # Number of columns for facet grid wrapping
+    sharex=False,    # Share x-axis (categories)? Often False if categories differ per facet
+    sharey=True,     # Share y-axis (values)? Often True if values are comparable
+    title=None,
+    palette="viridis",
+    height=4,        # Height (in inches) of each facet
+    aspect=1.2,      # Aspect ratio of each facet (width = height * aspect, adjusted default)
+    add_bar_labels=True,
+    label_format='{:,.0f}',
+    xtick_rotation=45, # Default rotation for x-axis labels
+    sort_categories=False, # Sorting categories less common for vertical grouped bars
+    hspace=0.4,        # Controls height space between facet rows
+    legend_loc='best'  # Default location if moved inside
+    ):
+    """
+    Creates a faceted grid of vertical grouped bar charts using Seaborn's catplot.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the data in a "long" format.
+        category_column (str): The name of the column for the x-axis (categories).
+        value_column (str): The name of the column for the y-axis (bar heights/values).
+        group_column (str): The name of the column to group by (hue).
+        facet_column (str): The name of the column to create facets by (using 'col').
+        facet_wrap (int, optional): Number of columns to wrap facets into. Defaults to None (all facets in one row).
+        sharex (bool, optional): Whether facets should share the x-axis (categories). Defaults to False.
+        sharey (bool, optional): Whether facets should share the y-axis (values). Defaults to True.
+        title (str, optional): The overall title for the FacetGrid figure. Defaults to None.
+        palette (str or list, optional): Seaborn color palette for the bars. Defaults to "viridis".
+        height (float, optional): Height (in inches) of each facet. Defaults to 4.
+        aspect (float, optional): Aspect ratio of each facet, so width = height * aspect. Defaults to 1.2.
+        add_bar_labels (bool, optional): If True, add data labels on top of the bars. Defaults to True.
+        label_format (str, optional): Python format string for the bar labels. Defaults to '{:,.0f}'.
+        xtick_rotation (int, optional): Rotation angle for x-axis tick labels. Defaults to 45.
+        sort_categories (bool, optional): If True, attempts to sort categories (x-axis). Defaults to False.
+        hspace (float, optional): Height space between subplot rows. Defaults to 0.4.
+        legend_loc (str, optional): Location for the legend (e.g., 'best', 'upper right'). Defaults to 'best'.
+
+    Returns:
+        seaborn.FacetGrid: The FacetGrid object containing the plot grid.
+
+    Raises:
+        ValueError: If specified columns are not found in the DataFrame or if data is unsuitable.
+        TypeError: If the input df is not a pandas DataFrame.
+    """
+    # --- Input Validation ---
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input 'df' must be a pandas DataFrame.")
+
+    required_columns = [category_column, value_column, group_column, facet_column]
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns in DataFrame: {missing_columns}")
+
+    # Check if value column is numeric
+    if not pd.api.types.is_numeric_dtype(df[value_column]):
+         # try to coerce the value column to a numeric type
+         try:
+             df[value_column] = pd.to_numeric(df[value_column], errors='coerce')
+             # Check for NaNs after coercion, which indicates failed conversion for some rows
+             if df[value_column].isnull().any():
+                 print(f"Warning: Some values in '{value_column}' could not be converted to numeric and became NaN.")
+         except Exception as e:
+             raise ValueError(f"Value column '{value_column}' must be numeric. Coercion failed. Error: {e}")
+
+    # Check if data exists
+    if df.empty:
+        raise ValueError("Input DataFrame 'df' is empty.")
+    # Drop rows where the numeric value column ended up being NaN after coercion attempt
+    plot_df = df.dropna(subset=[value_column]).copy()
+    if plot_df.empty:
+         raise ValueError(f"DataFrame is empty after removing rows with non-numeric values in '{value_column}'.")
+
+
+    # --- Sorting (Optional) ---
+    # Sort category order if requested
+    category_order = None
+    if sort_categories:
+        # Example: Sort categories based on the mean value across all groups/facets
+        # This is just one way, might need adjustment based on desired logic
+        mean_vals = plot_df.groupby(category_column)[value_column].mean().sort_values(ascending=False)
+        category_order = mean_vals.index.tolist()
+        print(f"Sorting categories (x-axis) by mean value: {category_order}")
+
+
+    # --- Plotting ---
+    # Create the faceted plot using catplot
+    g = sns.catplot(
+        data=plot_df,
+        x=category_column, # Category on x-axis for vertical bars
+        y=value_column,    # Value on y-axis
+        hue=group_column,  # Grouping variable
+        col=facet_column,  # Faceting variable
+        kind="bar",        # Specify bar chart type
+        errorbar=None,     # Turn off error bars
+        palette=palette,
+        height=height,     # Height of each facet
+        aspect=aspect,     # Aspect ratio of each facet
+        col_wrap=facet_wrap, # Wrap facets into columns
+        sharex=sharex,     # Control x-axis sharing
+        sharey=sharey,     # Control y-axis sharing
+        legend=True,       # *** Let catplot create the legend initially ***
+        # legend_out=False, # Keep legend inside plot area initially (default)
+        order=category_order # Apply category sorting if defined
+    )
+
+    # --- Styling and Labels ---
+    # Add overall title
+    if title:
+        # Adjust y position slightly more if hspace is large or title is long
+        title_y_pos = 1.02 + (hspace * 0.05) if facet_wrap and facet_wrap < len(plot_df[facet_column].unique()) else 1.02
+        g.fig.suptitle(title, y=title_y_pos, fontsize=14, fontweight='bold')
+
+    # Add bar labels if requested
+    if add_bar_labels:
+        for ax in g.axes.flat: # Iterate through all axes in the grid
+             # Check if axes has any containers (bars) before trying to label
+             if ax.containers:
+                 for container in ax.containers:
+                     try:
+                         ax.bar_label(
+                             container,
+                             fmt=label_format,
+                             padding=3,
+                             fontsize=8, # Adjust font size for facets
+                             rotation=0 # Usually no rotation needed for vertical
+                         )
+                     except Exception as e:
+                          print(f"Warning: Could not add bar labels to an axis. Error: {e}")
+                 # Adjust y-axis limits for labels if needed
+                 try:
+                     current_ylim = ax.get_ylim()
+                     # Ensure bottom limit is not negative if data is non-negative
+                     bottom_lim = 0 if current_ylim[0] >= 0 and plot_df[value_column].min() >= 0 else current_ylim[0]
+                     new_ylim_upper = current_ylim[1] * 1.1 # Increase upper limit slightly more
+                     ax.set_ylim(bottom=bottom_lim, top=new_ylim_upper)
+                 except Exception as e:
+                     print(f"Warning: Could not adjust ylim for an axis. Error: {e}")
+
+
+    # Improve axis labels and grid (applied to each facet)
+    g.set_axis_labels(
+        x_var=category_column.replace('_', ' ').title(), # Now x is category
+        y_var=value_column.replace('_', ' ').title()     # Now y is value
+    )
+    g.set_titles("{col_name}") # Set facet titles based on the facet_column values
+
+    # Rotate x-axis tick labels (categories)
+    g.set_xticklabels(rotation=xtick_rotation, ha='right', fontsize=9) # Adjust ha (horizontal alignment)
+    g.tick_params(axis='y', labelsize=9)
+
+
+    # Add grid lines to each facet
+    for ax in g.axes.flat:
+        ax.grid(axis='y', linestyle='--', alpha=0.7) # Horizontal grid lines
+
+    # --- Move Legend ---
+    # Access the legend created by catplot and move it if it exists
+    if g.legend is not None:
+        # Set the title for the existing legend
+        g.legend.set_title(group_column.replace('_', ' ').title())
+        # Move the legend using matplotlib's standard legend placement
+        # sns.move_legend(g, loc=legend_loc) # Use seaborn's helper function
+        # Or manually adjust bbox_to_anchor if needed:
+        sns.move_legend(g, loc='upper right', bbox_to_anchor=(1, 1)) # Example: Top right corner of figure
+
+
+    # Adjust layout AFTER potentially moving legend
+    # Use subplots_adjust for potentially finer control than tight_layout with facets/legends
+    # Adjust 'right' to make space for the legend if needed
+    g.fig.subplots_adjust(top=0.92, right=0.88, hspace=hspace) # Adjust top for title, right for legend
+
+
+    # --- Return FacetGrid Object ---
+    return g
+
+# Horizontal bar chart function
+def create_horizontal_bar_chart(
+    df,
+    category_column,
+    value_column,
+    title=None,
+    xlabel=None,
+    ylabel=None,
+    ax=None,
+    figsize=(10, 8),
+    top_n=None,
+    palette="viridis",
+    add_bar_labels=True, # New parameter to control bar labels
+    label_format='{:,.0f}' # New parameter for label formatting (default: integer with comma)
+    ):
+    """
+    Creates a horizontal bar chart using Seaborn, sorted by value.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the data.
+        category_column (str): The name of the column for the y-axis (categories).
+        value_column (str): The name of the column for the x-axis (bar lengths/values).
+        title (str, optional): The title for the chart. Defaults to None.
+        xlabel (str, optional): The label for the x-axis. Defaults to value_column name.
+        ylabel (str, optional): The label for the y-axis. Defaults to category_column name.
+        ax (matplotlib.axes.Axes, optional): An existing Axes object to plot on.
+                                             If None, a new figure and axes are created.
+                                             Defaults to None.
+        figsize (tuple, optional): The size of the figure to create if ax is None.
+                                   Defaults to (10, 8). Adjust height based on categories.
+        top_n (int, optional): If specified, only plot the top N categories based on value.
+                               Defaults to None (plot all).
+        palette (str or list, optional): Seaborn color palette for the bars.
+                                         Defaults to "viridis".
+        add_bar_labels (bool, optional): If True, add data labels to the end of the bars.
+                                         Defaults to True.
+        label_format (str, optional): Python format string for the bar labels.
+                                      Defaults to '{:,.0f}' (comma-separated integer).
+                                      Use '{:,.2f}' for 2 decimal places, etc.
+
+    Returns:
+        tuple: A tuple containing:
+            - fig (matplotlib.figure.Figure): The Figure object for the plot.
+            - ax (matplotlib.axes.Axes): The Axes object containing the plot.
+
+    Raises:
+        ValueError: If specified columns are not found in the DataFrame or if data is unsuitable.
+        TypeError: If the input df is not a pandas DataFrame.
+    """
+    # --- Input Validation ---
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input 'df' must be a pandas DataFrame.")
+
+    required_columns = [category_column, value_column]
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns in DataFrame: {missing_columns}")
+
+    # Check if value column is numeric
+    if not pd.api.types.is_numeric_dtype(df[value_column]):
+         # try to coerce the value column to a numeric type
+         try:
+             df[value_column] = pd.to_numeric(df[value_column], errors='coerce')
+         except Exception as e:
+             raise ValueError(f"Value column '{value_column}' must be numeric. Error: {e}")
+
+    # --- Data Preparation ---
+    # Create a copy to avoid modifying the original DataFrame
+    plot_df = df.copy()
+
+    # Sort by the value column in descending order
+    plot_df = plot_df.sort_values(by=value_column, ascending=False)
+
+    # Optionally select top N categories
+    if top_n is not None and isinstance(top_n, int) and top_n > 0:
+        plot_df = plot_df.head(top_n)
+    elif top_n is not None:
+        print("Warning: 'top_n' must be a positive integer. Plotting all categories.")
+
+    # Check if data remains after filtering/sorting
+    if plot_df.empty:
+        raise ValueError("No data available to plot after sorting/filtering.")
+
+
+    # --- Plotting ---
+    # Determine figure and axes
+    if ax is None:
+        # Adjust default figsize height based on number of categories
+        num_categories = plot_df[category_column].nunique()
+        dynamic_height = max(6, num_categories * 0.4) # Adjust multiplier as needed
+        figsize = (figsize[0], dynamic_height)
+        # Create new figure and axes if none are provided
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        # If axes are provided, get the figure they belong to
+        fig = ax.figure
+
+    # Create the horizontal bar plot using seaborn
+    barplot = sns.barplot( # Assign the barplot to a variable
+        data=plot_df,
+        x=value_column,
+        y=category_column,
+        palette=palette, # Apply color palette
+        ax=ax,
+    )
+
+    # --- Styling ---
+    # Set title
+    if title:
+        ax.set_title(title, fontsize=14, fontweight='bold')
+    else:
+        # Generate a default title if none provided
+        default_title = f"{value_column} by {category_column}"
+        if top_n:
+            default_title = f"Top {top_n} {default_title}"
+        ax.set_title(default_title, fontsize=14, fontweight='bold')
+
+    # Set labels
+    ax.set_xlabel(xlabel if xlabel else value_column.replace('_', ' ').title(), fontsize=12)
+    ax.set_ylabel(ylabel if ylabel else category_column.replace('_', ' ').title(), fontsize=12)
+
+    # Improve readability
+    ax.grid(axis='x', linestyle='--', alpha=0.7) # Add vertical grid lines
+    sns.despine(ax=ax) # Remove top and right spines
+
+    # --- Add Bar Labels (New Section) ---
+    if add_bar_labels:
+        # Iterate through the containers (bars) in the Axes object
+        for container in ax.containers:
+            ax.bar_label(
+                container,
+                fmt=label_format, # Apply user-defined format
+                padding=3,        # Add some padding between bar and label
+                fontsize=9       # Adjust font size as needed
+                )
+        # Optional: Adjust x-axis limits slightly to make room for labels on longest bars
+        # This prevents labels from being cut off if they extend beyond the default plot area.
+        # You might need to adjust the multiplier (e.g., 1.05 or 1.1) based on label length/font size.
+        current_xlim = ax.get_xlim()
+        new_xlim_upper = current_xlim[1] * 1.08 # Increase upper limit by 8%
+        ax.set_xlim(right=new_xlim_upper)
+
+
+    # --- Return Figure and Axes ---
+    return fig, ax # Always return both figure and axes
+
 # scatter plot function
 def create_scatter_plot(df, x_column, y_column, category_column, ax=None):
     """

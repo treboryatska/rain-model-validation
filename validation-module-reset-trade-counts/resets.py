@@ -98,110 +98,62 @@ def calculate_trades_between_resets(df):
         print(f"Error: {e}")
         return None
     
-# function to calculate the number of minutes between resets
-def calculate_minutes_between_resets(df):
+# function to calculate the number of minutes between executed auctions
+def calculate_minutes_between_executed_auctions(timestamp_series):
     """
-    Calculates the time difference in minutes between consecutive rows
-    where the 'resets' column is True, based on the 'trade_timestamp'.
+    Calculates the time difference in minutes between consecutive timestamps in a Series.
 
     Args:
-        df (pd.DataFrame): DataFrame containing 'trade_timestamp' and 'resets' columns.
-                           'trade_timestamp' can be datetime objects, Unix timestamps (seconds),
-                           or datetime strings.
+        timestamp_series (pd.Series): Series containing datetime-like values.
 
     Returns:
-        pd.DataFrame: A new DataFrame with the added 'minutes_since_last_reset' column,
-                      or None if an error occurs. The column contains the difference in minutes
-                      on rows where resets=True (NaN for the first reset). Other rows have NaN.
-                      Returns the DataFrame with just the NaN column if no resets are found.
+        pd.Series: A Series containing the difference in minutes between consecutive
+                   timestamps (aligned to the original index of the later timestamp).
+                   Returns None if an error occurs.
     """
-    # confirm the passed variable is a dataframe
-    if not isinstance(df, pd.DataFrame):
-        raise ValueError("The input must be a pandas DataFrame")
+    if not isinstance(timestamp_series, pd.Series):
+        raise TypeError("The input must be a pandas Series")
 
-    # confirm the required columns are present in the dataframe
-    required_columns = ["trade_timestamp", "resets"]
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        print("Cannot calculate the number of minutes between resets.")
-        raise ValueError(f"The required columns are missing from the dataframe: {missing_columns}")
-
-    print("Input DataFrame is valid and has required columns. Processing...")
+    print("Input Series is valid. Processing...")
 
     try:
-        # Create a copy to avoid modifying the original DataFrame passed to the function
-        df_copy = df.copy()
+        # Create a copy to avoid modifying the original series passed in
+        series_copy = timestamp_series.copy()
 
-        # --- Step 1: Ensure 'trade_timestamp' is datetime ---
-        # Check if the column is already a datetime type
-        if not pd.api.types.is_datetime64_any_dtype(df_copy['trade_timestamp']):
-            print("Converting 'trade_timestamp' to datetime format...")
-            # Attempt conversion, trying numeric (assuming seconds) then standard strings
+        # --- Step 1: Ensure series values are datetime ---
+        if not pd.api.types.is_datetime64_any_dtype(series_copy):
+            print("Converting Series to datetime format...")
             try:
-                # Try numeric conversion first (e.g., Unix timestamp in seconds)
-                df_copy['trade_timestamp'] = pd.to_datetime(df_copy['trade_timestamp'], unit='s', errors='raise')
+                series_copy = pd.to_datetime(series_copy, unit='s', errors='raise')
                 print("Successfully converted from Unix timestamp (seconds).")
             except (ValueError, TypeError, OverflowError):
-                # If numeric fails, try standard datetime string conversion
                 print("Unix timestamp conversion failed or not applicable, trying standard datetime string conversion...")
                 try:
-                    df_copy['trade_timestamp'] = pd.to_datetime(df_copy['trade_timestamp'], errors='raise')
+                    series_copy = pd.to_datetime(series_copy, errors='raise')
                     print("Successfully converted from datetime string.")
                 except Exception as dt_err:
-                    raise ValueError(f"Failed to convert 'trade_timestamp' to datetime. Original error: {dt_err}")
+                    raise ValueError(f"Failed to convert Series to datetime. Original error: {dt_err}")
 
-        # Check for NaT (Not a Time) values after conversion
-        if df_copy['trade_timestamp'].isnull().any():
-            raise ValueError("Found null values in 'trade_timestamp' after conversion. Please check data.")
+        if series_copy.isnull().any():
+            raise ValueError("Found null values in Series after conversion. Please check data.")
 
-        # --- Step 2: Sort by trade_timestamp ---
-        print("Sorting DataFrame by 'trade_timestamp'...")
-        # ignore_index=True resets the index after sorting, which is often cleaner,
-        # but we need the original index to map results back, so we keep the original index.
-        df_copy = df_copy.sort_values(by='trade_timestamp', ascending=True)
+        # --- Step 2: Sort by timestamp value ---
+        print("Sorting Series by timestamp...")
+        series_sorted = series_copy.sort_values(ascending=True) # Sort the values
 
-        # --- Step 3: Initialize the new column ---
-        df_copy['minutes_since_last_reset'] = np.nan
+        # --- Step 3: Calculate difference ---
+        # .diff() calculates difference from the PREVIOUS row in the sorted series
+        time_diff = series_sorted.diff() # This Series keeps the original index
 
-        # --- Step 4: Filter rows where 'resets' is True ---
-        # Ensure 'resets' is boolean, coerce if necessary (e.g., if it's 0/1)
-        if not pd.api.types.is_bool_dtype(df_copy['resets']):
-             print("Warning: 'resets' column is not boolean. Attempting to coerce.")
-             try:
-                 df_copy['resets'] = df_copy['resets'].astype(bool)
-             except Exception as bool_err:
-                 raise TypeError(f"Could not convert 'resets' column to boolean: {bool_err}")
+        # --- Step 4: Convert to minutes ---
+        minutes_diff = time_diff.dt.total_seconds() / 60
+        minutes_diff.name = 'minutes_since_last_executed_auction' # Give the result series a name
 
-        reset_rows = df_copy[df_copy['resets']].copy() # Use .copy() to avoid potential SettingWithCopyWarning
-
-        # --- Step 5 & 6: Calculate difference and convert to minutes ---
-        if not reset_rows.empty:
-            print(f"Found {len(reset_rows)} reset points. Calculating time differences...")
-
-            # Calculate the time difference between consecutive reset timestamps in the filtered subset
-            # .diff() calculates the difference between the current row and the previous row
-            time_diff = reset_rows['trade_timestamp'].diff() # This Series keeps the original index from df_copy
-
-            # Convert the time difference (Timedelta object) to total minutes
-            # .dt.total_seconds() gives float seconds, divide by 60 for minutes
-            minutes_diff = time_diff.dt.total_seconds() / 60
-
-            # --- Step 7: Assign results back to the original DataFrame copy ---
-            # Use .loc with the index from 'minutes_diff' (which matches the reset rows in df_copy)
-            # This assigns the calculated minutes to the 'minutes_since_last_reset' column
-            # ONLY for the rows where 'resets' was True. The first reset row gets NaN from .diff().
-            df_copy.loc[minutes_diff.index, 'minutes_since_last_reset'] = minutes_diff
-
-            print("Finished calculating the number of minutes between resets.")
-            return df_copy
-        else:
-            print("No rows found where 'resets' is True. Returning DataFrame with 'minutes_since_last_reset' column initialized to NaN.")
-            # Return the df_copy even if no resets, it will have the NaN column
-            return df_copy
+        print("finished calculating the number of minutes between executed auctions")
+        return minutes_diff # Return the Series of differences (with original index)
 
     except Exception as e:
         print(f"An error occurred during calculation: {e}")
-        # Optionally print traceback for debugging
-        # import traceback
-        # print(traceback.format_exc())
-        return None # Indicate failure
+        import traceback
+        print(traceback.format_exc())
+        return None
