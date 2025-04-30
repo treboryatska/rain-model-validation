@@ -268,7 +268,7 @@ def create_faceted_grouped_bar_chart(
     sharex=False,    # Share x-axis (categories)? Often False if categories differ per facet
     sharey=True,     # Share y-axis (values)? Often True if values are comparable
     title=None,
-    palette="viridis",
+    palette=None,
     height=4,        # Height (in inches) of each facet
     aspect=1.2,      # Aspect ratio of each facet (width = height * aspect, adjusted default)
     add_bar_labels=True,

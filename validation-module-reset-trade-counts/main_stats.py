@@ -19,7 +19,7 @@ from charts import (
 )
 
 # get the aggregated results
-aggregated_results_url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS40xTNsmzikrCuJ6Hr3YuqLepPpYwgAblbpQWbtp-oWQmoWSQJFnoisvc62kwqvqpIuzYDkZtVyqlt/pub?gid=1449687561&single=true&output=csv'
+aggregated_results_url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTp30f3WibEMQHOO5SkBDrCjJFTem_0mXgnnTQHWAVZaqmr-S1DnW4Z4GRlBrQxjgZCzMNYscznxKKb/pub?gid=2145683509&single=true&output=csv'
 
 # tell the stats script where to output the stats results
 today = datetime.now().strftime("%Y-%m-%d")
@@ -80,14 +80,20 @@ except Exception as e:
     print(f"\nError saving test results to {output_file_path}: {e}")
     raise Exception(f"Error saving test results to {output_file_path}: {e}")
 
-###################################################################################################################################
+##################################################################################################################################################################
 # charts
-###################################################################################################################################
+##################################################################################################################################################################
 print("\nGenerating charts...")
 
 # print info about the orders_df
 print(f"\nOrders dataframe info:\n")
 print(orders_df.info())
+
+# define color map for actual vs modeled
+metric_color_map = {
+    'Modeled': '#4C72B0',  # Muted blue/teal
+    'Actual': '#55A868'   # Medium green
+}
 
 # ################################################################ chart: 
 # ############# DESCRIPTION: horizontal bar chart of actual_median_minutes_between_executed_auctions by model_version
@@ -138,7 +144,54 @@ except Exception as e:
     raise Exception(f"Error plotting horizontal bar chart: {e}")
 
 # ################################################################ chart: 
-# ############# DESCRIPTION: grouped bar chart of actual_reset_count and model_output_reset_count by target_order_hash
+# ############# DESCRIPTION: grouped vertical bar chart of strategy_trade_count and model_output_auction_count by target_order_hash
+# ############# X AXIS: target_order_hash
+# ############# Y AXIS: strategy_trade_count and model_output_auction_count
+# ############# DF: order_hash and strategy_trade_count and model_output_auction_count
+# ################################################################
+
+# prepare the df for the chart; keep only the left 5 characters of the order_hash; df must be in long format
+auction_counts_chart_df = orders_df[['target_order_hash', 'model_version', 'strategy_trade_count', 'model_output_auction_count']].copy()
+auction_counts_chart_df['target_order_hash'] = auction_counts_chart_df['target_order_hash'].str[:5]
+
+# Use melt to transform from wide to long format
+auction_counts_long_chart_df = pd.melt(
+    auction_counts_chart_df,
+    id_vars=['target_order_hash', 'model_version'],  # Column(s) to keep as identifiers
+    value_vars=['strategy_trade_count', 'model_output_auction_count'], # Columns to unpivot
+    var_name='metric_type',  # Name of the new column holding 'strategy_trade_count'/'model_output_auction_count'
+    value_name='auction_count' # Name of the new column holding the corresponding values
+)
+
+# Clean up the 'metric_type' column values
+auction_counts_long_chart_df['metric_type'] = auction_counts_long_chart_df['metric_type'].replace({
+    'strategy_trade_count': 'Actual',
+    'model_output_auction_count': 'Modeled'
+})
+
+try:
+    facet_grid = create_faceted_grouped_bar_chart(
+        df=auction_counts_long_chart_df,
+        category_column='target_order_hash',
+        value_column='auction_count',
+        group_column='metric_type',
+        facet_column='model_version', # Create subplots for each model version
+        facet_wrap=3, # Arrange facets in 3 columns
+        title='Actual vs. Modeled Auction Counts by Model Version',
+        sharey=False, # Allow different y-axes (categories) per facet
+        palette=metric_color_map
+    )
+    filename = "grouped_bar_chart_actual_vs_modeled_auction_count.png"
+    save_path = output_dir_str / filename
+    print(f"Saving grouped bar chart to: {output_dir}/{filename}")
+    # plt.show() # Show plot interactively
+    facet_grid.savefig(save_path)
+except Exception as e:
+    print(f"\nError plotting grouped bar chart: {e}")
+    raise Exception(f"Error plotting grouped bar chart: {e}")
+
+# ################################################################ chart: 
+# ############# DESCRIPTION: grouped vertical bar chart of actual_reset_count and model_output_reset_count by target_order_hash
 # ############# X AXIS: target_order_hash
 # ############# Y AXIS: actual_reset_count and model_output_reset_count
 # ############# DF: order_hash and actual_reset_count and model_output_reset_count
@@ -172,7 +225,8 @@ try:
         facet_column='model_version', # Create subplots for each model version
         facet_wrap=3, # Arrange facets in 3 columns
         title='Actual vs. Modeled Reset Counts by Model Version',
-        sharey=False # Allow different y-axes (categories) per facet
+        sharey=False, # Allow different y-axes (categories) per facet
+        palette=metric_color_map
     )
     filename = "grouped_bar_chart_actual_vs_modeled_reset_count.png"
     save_path = output_dir_str / filename
@@ -184,7 +238,7 @@ except Exception as e:
     raise Exception(f"Error plotting grouped bar chart: {e}")
 
 # ################################################################ chart: 
-# ############# DESCRIPTION: grouped bar chart of actual_median_trade_count_between_resets and model_output_median_trade_count_between_resets by target_order_hash
+# ############# DESCRIPTION: grouped vertical bar chart of actual_median_trade_count_between_resets and model_output_median_trade_count_between_resets by target_order_hash
 # ############# X AXIS: target_order_hash
 # ############# Y AXIS: actual_median_trade_count_between_resets and model_output_median_trade_count_between_resets
 # ############# DF: order_hash and actual_median_trade_count_between_resets and model_output_median_trade_count_between_resets
@@ -199,7 +253,7 @@ reset_counts_median_long_chart_df = pd.melt(
     id_vars=['target_order_hash', 'model_version'],  # Column(s) to keep as identifiers
     value_vars=['actual_median_trade_count_between_resets', 'model_output_median_trade_count_between_resets'], # Columns to unpivot
     var_name='metric_type',  # Name of the new column holding 'actual_median_trade_count_between_resets'/'model_output_median_trade_count_between_resets'
-    value_name='median_trade_count_between_resets' # Name of the new column holding the corresponding values
+    value_name='median_auction_count_between_resets' # Name of the new column holding the corresponding values
 )
 
 # Clean up the 'metric_type' column values
@@ -212,14 +266,15 @@ try:
     facet_grid = create_faceted_grouped_bar_chart(
         df=reset_counts_median_long_chart_df,
         category_column='target_order_hash',
-        value_column='median_trade_count_between_resets',
+        value_column='median_auction_count_between_resets',
         group_column='metric_type',
         facet_column='model_version', # Create subplots for each model version
         facet_wrap=3, # Arrange facets in 3 columns
-        title='Actual vs. Modeled Median Executed Auction Count Between Resets by Model Version',
-        sharey=False # Allow different y-axes (categories) per facet
+        title='Actual vs. Modeled Median Auction Count Between Resets by Model Version',
+        sharey=False, # Allow different y-axes (categories) per facet
+        palette=metric_color_map
     )
-    filename = "grouped_bar_chart_actual_vs_modeled_median_trade_count_between_resets.png"
+    filename = "grouped_bar_chart_actual_vs_modeled_median_auction_count_between_resets.png"
     save_path = output_dir_str / filename
     print(f"Saving grouped bar chart to: {output_dir}/{filename}")
     # plt.show() # Show plot interactively
@@ -229,7 +284,7 @@ except Exception as e:
     raise Exception(f"Error plotting grouped bar chart: {e}")
 
 # ################################################################ chart: 
-# ############# DESCRIPTION: grouped bar chart of actual_average_trade_count_between_resets and model_output_average_trade_count_between_resets by target_order_hash
+# ############# DESCRIPTION: grouped vertical bar chart of actual_average_trade_count_between_resets and model_output_average_trade_count_between_resets by target_order_hash
 # ############# X AXIS: target_order_hash
 # ############# Y AXIS: actual_average_trade_count_between_resets and model_output_average_trade_count_between_resets
 # ############# DF: order_hash and actual_average_trade_count_between_resets and model_output_average_trade_count_between_resets
@@ -241,7 +296,7 @@ reset_counts_average_long_chart_df = pd.melt(
     id_vars=['target_order_hash', 'model_version'],  # Column(s) to keep as identifiers
     value_vars=['model_output_average_trade_count_between_resets', 'actual_average_trade_count_between_resets'], # Columns to unpivot
     var_name='metric_type',  # Name of the new column holding 'actual_median_trade_count_between_resets'/'model_output_median_trade_count_between_resets'
-    value_name='average_trade_count_between_resets' # Name of the new column holding the corresponding values
+    value_name='average_auction_count_between_resets' # Name of the new column holding the corresponding values
 )
 
 # Clean up the 'metric_type' column values
@@ -254,14 +309,15 @@ try:
     facet_grid = create_faceted_grouped_bar_chart(
         df=reset_counts_average_long_chart_df,
         category_column='target_order_hash',
-        value_column='average_trade_count_between_resets',
+        value_column='average_auction_count_between_resets',
         group_column='metric_type',
         facet_column='model_version', # Create subplots for each model version
         facet_wrap=3, # Arrange facets in 3 columns
-        title='Actual vs. Modeled Average Executed Auction Count Between Resets by Model Version',
-        sharey=False # Allow different y-axes (categories) per facet
+        title='Actual vs. Modeled Average Auction Count Between Resets by Model Version',
+        sharey=False, # Allow different y-axes (categories) per facet
+        palette=metric_color_map
     )
-    filename = "grouped_bar_chart_actual_vs_modeled_average_trade_count_between_resets.png"
+    filename = "grouped_bar_chart_actual_vs_modeled_average_auction_count_between_resets.png"
     save_path = output_dir_str / filename
     print(f"Saving grouped bar chart to: {output_dir}/{filename}")
     # plt.show() # Show plot interactively
