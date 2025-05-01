@@ -328,3 +328,216 @@ def trade_count_between_resets_difference_test(orders_df):
 
     # run a test on m15_test model type
     
+
+# test the hypothesis: mean and median difference between modeled and actual trade count between resets is 0 for a subset of the orders
+def trade_count_between_resets_difference_test_subset(orders_df):
+
+    # check that orders_df is a dataframe
+    if not isinstance(orders_df, pd.DataFrame):
+        print("orders_df is not a dataframe")
+        raise Exception("orders_df is not a dataframe")
+
+    # check if the orders are empty
+    if orders_df.empty:
+        print("No orders found in the subset results")
+        raise Exception("No orders found in the subset results")
+    
+    # get the subset of columns for the test
+    subset_orders_df_diff_modeled_vs_actual = orders_df[['model_version', 'auction_count_difference_modeled_vs_actual', 'reset_count_difference_modeled_vs_actual', 'median_trade_count_difference_modeled_vs_actual', 'average_trade_count_difference_modeled_vs_actual', 'std_trade_count_difference_modeled_vs_actual', 'median_trade_count_difference_modeled_vs_actual_percentage', 'average_trade_count_difference_modeled_vs_actual_percentage']]
+
+    # get the auction count difference
+    auction_count_difference_modeled_vs_actual = pd.to_numeric(subset_orders_df_diff_modeled_vs_actual['auction_count_difference_modeled_vs_actual'], errors='coerce').dropna()
+
+    # get the count of resets
+    reset_count_difference_modeled_vs_actual = pd.to_numeric(subset_orders_df_diff_modeled_vs_actual['reset_count_difference_modeled_vs_actual'], errors='coerce').dropna()
+
+    # get the median; convert to numeric and drop na
+    median_trade_count_between_resets_difference_modeled_vs_actual = pd.to_numeric(subset_orders_df_diff_modeled_vs_actual['median_trade_count_difference_modeled_vs_actual'], errors='coerce').dropna()
+
+    # get the average; convert to numeric and drop na
+    average_trade_count_between_resets_difference_modeled_vs_actual = pd.to_numeric(subset_orders_df_diff_modeled_vs_actual['average_trade_count_difference_modeled_vs_actual'], errors='coerce').dropna()
+
+    # get the std; convert to numeric and drop na
+    std_trade_count_between_resets_difference_modeled_vs_actual = pd.to_numeric(subset_orders_df_diff_modeled_vs_actual['std_trade_count_difference_modeled_vs_actual'], errors='coerce').dropna()
+
+    # get the median trade count percentage; convert to numeric and drop na
+    median_trade_count_between_resets_difference_modeled_vs_actual_percentage = pd.to_numeric(subset_orders_df_diff_modeled_vs_actual['median_trade_count_difference_modeled_vs_actual_percentage'], errors='coerce').dropna()
+
+    # get the average trade count percentage; convert to numeric and drop na
+    average_trade_count_between_resets_difference_modeled_vs_actual_percentage = pd.to_numeric(subset_orders_df_diff_modeled_vs_actual['average_trade_count_difference_modeled_vs_actual_percentage'], errors='coerce').dropna()
+
+    # calculate mean, median, skew, and kurtosis for each metric
+    # auction count difference
+    auction_count_difference_mean = auction_count_difference_modeled_vs_actual.mean()
+    auction_count_difference_median = auction_count_difference_modeled_vs_actual.median()
+    # auction_count_difference_skew = auction_count_difference_modeled_vs_actual.skew()
+    # auction_count_difference_kurtosis = auction_count_difference_modeled_vs_actual.kurtosis()
+
+    # reset count difference
+    reset_count_difference_mean = reset_count_difference_modeled_vs_actual.mean()
+    reset_count_difference_median = reset_count_difference_modeled_vs_actual.median()
+    # reset_count_difference_skew = reset_count_difference_modeled_vs_actual.skew()
+    # reset_count_difference_kurtosis = reset_count_difference_modeled_vs_actual.kurtosis()
+
+    # median trade count between resets difference
+    median_difference_trade_count_between_resets_mean = median_trade_count_between_resets_difference_modeled_vs_actual.mean()
+    median_difference_trade_count_between_resets_median = median_trade_count_between_resets_difference_modeled_vs_actual.median()
+    # median_difference_trade_count_between_resets_skew = median_trade_count_between_resets_difference_modeled_vs_actual.skew()
+    # median_difference_trade_count_between_resets_kurtosis = median_trade_count_between_resets_difference_modeled_vs_actual.kurtosis()
+
+    # average trade count between resets difference
+    average_difference_trade_count_between_resets_mean = average_trade_count_between_resets_difference_modeled_vs_actual.mean()
+    average_difference_trade_count_between_resets_median = average_trade_count_between_resets_difference_modeled_vs_actual.median()
+    # average_difference_trade_count_between_resets_skew = average_trade_count_between_resets_difference_modeled_vs_actual.skew()
+    # average_difference_trade_count_between_resets_kurtosis = average_trade_count_between_resets_difference_modeled_vs_actual.kurtosis()
+
+    # std trade count between resets difference
+    std_difference_trade_count_between_resets_mean = std_trade_count_between_resets_difference_modeled_vs_actual.mean()
+    std_difference_trade_count_between_resets_median = std_trade_count_between_resets_difference_modeled_vs_actual.median()
+    # std_difference_trade_count_between_resets_skew = std_trade_count_between_resets_difference_modeled_vs_actual.skew()
+    # std_difference_trade_count_between_resets_kurtosis = std_trade_count_between_resets_difference_modeled_vs_actual.kurtosis()
+
+    # median trade count between resets difference percentage
+    median_difference_trade_count_between_resets_percentage_mean = median_trade_count_between_resets_difference_modeled_vs_actual_percentage.mean()
+    median_difference_trade_count_between_resets_percentage_median = median_trade_count_between_resets_difference_modeled_vs_actual_percentage.median()
+    # median_difference_trade_count_between_resets_percentage_skew = median_trade_count_between_resets_difference_modeled_vs_actual_percentage.skew()
+    # median_difference_trade_count_between_resets_percentage_kurtosis = median_trade_count_between_resets_difference_modeled_vs_actual_percentage.kurtosis()
+
+    # average trade count between resets difference percentage
+    average_difference_trade_count_between_resets_percentage_mean = average_trade_count_between_resets_difference_modeled_vs_actual_percentage.mean()
+    average_difference_trade_count_between_resets_percentage_median = average_trade_count_between_resets_difference_modeled_vs_actual_percentage.median()
+    # average_difference_trade_count_between_resets_percentage_skew = average_trade_count_between_resets_difference_modeled_vs_actual_percentage.skew()
+    # average_difference_trade_count_between_resets_percentage_kurtosis = average_trade_count_between_resets_difference_modeled_vs_actual_percentage.kurtosis()
+
+    # print the results
+    print(f"\nsubset or orders, model version matched as closely as possibel to median minutes between auctions from acutal strategy results:")
+    print(f"Auction Count Difference Mean: {auction_count_difference_mean}")
+    print(f"Auction Count Difference Median: {auction_count_difference_median}")
+    # print(f"Auction Count Difference Skew: {auction_count_difference_skew}")
+    # print(f"Auction Count Difference Kurtosis: {auction_count_difference_kurtosis}")
+    print(f"Reset Count Difference Mean: {reset_count_difference_mean}")
+    print(f"Reset Count Difference Median: {reset_count_difference_median}")
+    # print(f"Reset Count Difference Skew: {reset_count_difference_skew}")
+    # print(f"Reset Count Difference Kurtosis: {reset_count_difference_kurtosis}")
+    print(f"Median Trade Count Between Resets Difference Mean: {median_difference_trade_count_between_resets_mean}")
+    print(f"Median Trade Count Between Resets Difference Median: {median_difference_trade_count_between_resets_median}")
+    # print(f"Median Trade Count Between Resets Difference Skew: {median_difference_trade_count_between_resets_skew}")
+    # print(f"Median Trade Count Between Resets Difference Kurtosis: {median_difference_trade_count_between_resets_kurtosis}")
+    print(f"Average Trade Count Between Resets Difference Mean: {average_difference_trade_count_between_resets_mean}")
+    print(f"Average Trade Count Between Resets Difference Median: {average_difference_trade_count_between_resets_median}")
+    # print(f"Average Trade Count Between Resets Difference Skew: {average_difference_trade_count_between_resets_skew}")
+    # print(f"Average Trade Count Between Resets Difference Kurtosis: {average_difference_trade_count_between_resets_kurtosis}")
+    print(f"Std Trade Count Between Resets Difference Mean: {std_difference_trade_count_between_resets_mean}")
+    print(f"Std Trade Count Between Resets Difference Median: {std_difference_trade_count_between_resets_median}")
+    # print(f"Std Trade Count Between Resets Difference Skew: {std_difference_trade_count_between_resets_skew}")
+    # print(f"Std Trade Count Between Resets Difference Kurtosis: {std_difference_trade_count_between_resets_kurtosis}")
+    print(f"Median Trade Count Between Resets Difference Percentage Mean: {median_difference_trade_count_between_resets_percentage_mean}")
+    print(f"Median Trade Count Between Resets Difference Percentage Median: {median_difference_trade_count_between_resets_percentage_median}")
+    # print(f"Median Trade Count Between Resets Difference Percentage Skew: {median_difference_trade_count_between_resets_percentage_skew}")
+    # print(f"Median Trade Count Between Resets Difference Percentage Kurtosis: {median_difference_trade_count_between_resets_percentage_kurtosis}")
+    print(f"Average Trade Count Between Resets Difference Percentage Mean: {average_difference_trade_count_between_resets_percentage_mean}")
+    print(f"Average Trade Count Between Resets Difference Percentage Median: {average_difference_trade_count_between_resets_percentage_median}")
+    # print(f"Average Trade Count Between Resets Difference Percentage Skew: {average_difference_trade_count_between_resets_percentage_skew}")
+    # print(f"Average Trade Count Between Resets Difference Percentage Kurtosis: {average_difference_trade_count_between_resets_percentage_kurtosis}")
+
+    # --- Define Hypothesis ---
+    # H0: The median of the differences is 0.
+    # Ha: The median of the differences is not 0. (two-sided test)
+
+    # --- Perform the Wilcoxon Signed-Rank Test ---
+    # Pass the cleaned data series directly.
+    # By default, it tests against a median of 0.
+    # 'alternative='two-sided'' is the default, explicitly stated here for clarity.
+    # Consider adding correction=True if you have a small sample size or many ties
+    # run the test against difference in auction count
+    auction_count_difference_statistic, auction_count_difference_p_value = wilcoxon(auction_count_difference_modeled_vs_actual, alternative='two-sided', correction=True)
+
+    # run the test against difference in reset count
+    reset_count_difference_statistic, reset_count_difference_p_value = wilcoxon(reset_count_difference_modeled_vs_actual, alternative='two-sided', correction=True)
+
+    # run the test against difference in median trade count between resets
+    median_trade_count_between_resets_statistic, median_trade_count_between_resets_p_value = wilcoxon(median_trade_count_between_resets_difference_modeled_vs_actual, alternative='two-sided', correction=True)
+
+    # run the test against difference in average trade count between resets
+    average_trade_count_between_resets_statistic, average_trade_count_between_resets_p_value = wilcoxon(average_trade_count_between_resets_difference_modeled_vs_actual, alternative='two-sided', correction=True)
+
+    # run the test against difference in std trade count between resets
+    std_trade_count_between_resets_statistic, std_trade_count_between_resets_p_value = wilcoxon(std_trade_count_between_resets_difference_modeled_vs_actual, alternative='two-sided', correction=True)
+
+    # run the test against difference in median trade count between resets percentage
+    median_trade_count_between_resets_difference_percentage_statistic, median_trade_count_between_resets_difference_percentage_p_value = wilcoxon(median_trade_count_between_resets_difference_modeled_vs_actual_percentage, alternative='two-sided', correction=True)
+
+    # run the test against difference in average trade count between resets percentage
+    average_trade_count_between_resets_difference_percentage_statistic, average_trade_count_between_resets_difference_percentage_p_value = wilcoxon(average_trade_count_between_resets_difference_modeled_vs_actual_percentage, alternative='two-sided', correction=True)
+
+    # print the results
+    print(f"\nWilcoxon Signed-Rank Test Results for the subset of orders:")
+    print(f"Auction Count Statistic: {auction_count_difference_statistic}")
+    print(f"Auction Count P-value: {auction_count_difference_p_value}")
+    print(f"Reset Count Statistic: {reset_count_difference_statistic}")
+    print(f"Reset Count P-value: {reset_count_difference_p_value}")
+    print(f"Median Statistic: {median_trade_count_between_resets_statistic}")
+    print(f"Median P-value: {median_trade_count_between_resets_p_value}")
+    print(f"Average Statistic: {average_trade_count_between_resets_statistic}")
+    print(f"Average P-value: {average_trade_count_between_resets_p_value}")
+    print(f"Std Statistic: {std_trade_count_between_resets_statistic}")
+    print(f"Std P-value: {std_trade_count_between_resets_p_value}")
+    print(f"Median Trade Count Between Resets Difference Percentage Statistic: {median_trade_count_between_resets_difference_percentage_statistic}")
+    print(f"Median Trade Count Between Resets Difference Percentage P-value: {median_trade_count_between_resets_difference_percentage_p_value}")
+    print(f"Average Trade Count Between Resets Difference Percentage Statistic: {average_trade_count_between_resets_difference_percentage_statistic}")
+    print(f"Average Trade Count Between Resets Difference Percentage P-value: {average_trade_count_between_resets_difference_percentage_p_value}")
+
+    # store the results in the dictionary
+    stats_results_dict = {
+        "analysis_type": "subset_orders",
+        "auction_count_difference_mean": auction_count_difference_mean,
+        "auction_count_difference_median": auction_count_difference_median,
+        # "auction_count_difference_skew": auction_count_difference_skew,
+        # "auction_count_difference_kurtosis": auction_count_difference_kurtosis, 
+        "reset_count_difference_mean": reset_count_difference_mean,
+        "reset_count_difference_median": reset_count_difference_median,
+        # "reset_count_difference_skew": reset_count_difference_skew,
+        # "reset_count_difference_kurtosis": reset_count_difference_kurtosis, 
+        "median_difference_trade_count_between_resets_mean": median_difference_trade_count_between_resets_mean,
+        "median_difference_trade_count_between_resets_median": median_difference_trade_count_between_resets_median,
+        # "median_difference_trade_count_between_resets_skew": median_difference_trade_count_between_resets_skew,
+        # "median_difference_trade_count_between_resets_kurtosis": median_difference_trade_count_between_resets_kurtosis,
+        "average_difference_trade_count_between_resets_mean": average_difference_trade_count_between_resets_mean,
+        "average_difference_trade_count_between_resets_median": average_difference_trade_count_between_resets_median,
+        # "average_difference_trade_count_between_resets_skew": average_difference_trade_count_between_resets_skew,
+        # "average_difference_trade_count_between_resets_kurtosis": average_difference_trade_count_between_resets_kurtosis,
+        "std_difference_trade_count_between_resets_mean": std_difference_trade_count_between_resets_mean,
+        "std_difference_trade_count_between_resets_median": std_difference_trade_count_between_resets_median,
+        # "std_difference_trade_count_between_resets_skew": std_difference_trade_count_between_resets_skew,
+        # "std_difference_trade_count_between_resets_kurtosis": std_difference_trade_count_between_resets_kurtosis,
+        "median_difference_trade_count_between_resets_percentage_mean": median_difference_trade_count_between_resets_percentage_mean,
+        "median_difference_trade_count_between_resets_percentage_median": median_difference_trade_count_between_resets_percentage_median,
+        # "median_difference_trade_count_between_resets_percentage_skew": median_difference_trade_count_between_resets_percentage_skew,
+        # "median_difference_trade_count_between_resets_percentage_kurtosis": median_difference_trade_count_between_resets_percentage_kurtosis,
+        "average_difference_trade_count_between_resets_percentage_mean": average_difference_trade_count_between_resets_percentage_mean,
+        "average_difference_trade_count_between_resets_percentage_median": average_difference_trade_count_between_resets_percentage_median,
+        # "average_difference_trade_count_between_resets_percentage_skew": average_difference_trade_count_between_resets_percentage_skew,
+        # "average_difference_trade_count_between_resets_percentage_kurtosis": average_difference_trade_count_between_resets_percentage_kurtosis,
+        "auction_count_difference_statistic": auction_count_difference_statistic,
+        "auction_count_difference_p_value": auction_count_difference_p_value,
+        "reset_count_difference_statistic": reset_count_difference_statistic,
+        "reset_count_difference_p_value": reset_count_difference_p_value,
+        "median_trade_count_between_resets_statistic": median_trade_count_between_resets_statistic,
+        "median_trade_count_between_resets_p_value": median_trade_count_between_resets_p_value,
+        "average_trade_count_between_resets_statistic": average_trade_count_between_resets_statistic,
+        "average_trade_count_between_resets_p_value": average_trade_count_between_resets_p_value,
+        "std_trade_count_between_resets_statistic": std_trade_count_between_resets_statistic,
+        "std_trade_count_between_resets_p_value": std_trade_count_between_resets_p_value,
+        "median_trade_count_between_resets_difference_percentage_statistic": median_trade_count_between_resets_difference_percentage_statistic,
+        "median_trade_count_between_resets_difference_percentage_p_value": median_trade_count_between_resets_difference_percentage_p_value,
+        "average_trade_count_between_resets_difference_percentage_statistic": average_trade_count_between_resets_difference_percentage_statistic,
+        "average_trade_count_between_resets_difference_percentage_p_value": average_trade_count_between_resets_difference_percentage_p_value,
+    }
+
+    # check if the dictionary is empty
+    if not stats_results_dict:
+        print("No results found in the stats dictionary")
+        raise Exception("No results found in the stats dictionary")
+
+    # return the results in a dictionary
+    return stats_results_dict

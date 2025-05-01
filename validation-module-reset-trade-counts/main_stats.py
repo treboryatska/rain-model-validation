@@ -59,7 +59,7 @@ if not test_results:
     raise Exception("Test results are not valid. Exiting...")
 
 # print the results
-print(f"\nTest results: {test_results}\n")
+# print(f"\nTest results: {test_results}\n")
 
 try:
 
