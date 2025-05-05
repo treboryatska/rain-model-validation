@@ -1,6 +1,7 @@
 import pandas as pd
 from batch import get_sample_dataset
 from datetime import datetime
+from pathlib import Path
 
 from resources import subgraph_urls, parse_flexible_date
 from orders import get_order_info
@@ -18,13 +19,19 @@ from check import (
     clean_model_output_file
 )
 from stats import basic_stats
+from charts import plot_cumulative_trade_minutes_bar
 
 # get the sample of order for the model batch
 batch_sample_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSZIpAiKpNkf85Nja7XnJf1UsqjKD2QzeRCF4KfXJXkfOVsYkLCl1DjjjBFTwoWnyND6QmR9kBCLtkN/pub?gid=1535040418&single=true&output=csv"
 
 # tell the validation script where to output the validation outputs
 today = datetime.now().strftime("%Y-%m-%d")
-output_file_path = f"~/Downloads/validation_outputs_{today}.csv"
+output_dir = "~/Downloads"
+output_file_path = f"{output_dir}/validation_outputs_{today}.csv"
+
+# tell the script where to output the charts
+# create the string path to the output directory -- required for saving chart pngs
+output_dir_str = Path(output_dir).expanduser().resolve()
 
 orders = get_sample_dataset(batch_sample_url)
 
@@ -382,6 +389,39 @@ for model in model_list:
                 **strategy_basic_stats 
             }
         )
+
+        # #####################################################################################
+        # get charts for each order hash
+        # only generate charts for one version of the model, otherwise it is just duplicating the same chart for each version since the actual strategy data doesn't change from version-to-version
+        # #####################################################################################
+
+        # ################################################################ chart: 
+        # ############# DESCRIPTION: cumulative sum line chart of minutes_since_last_executed_auction
+        # ############# X AXIS: trade_timestamp_human
+        # ############# Y AXIS: minutes_since_last_executed_auction
+        # ################################################################
+        if model == "m15":
+            try: 
+                print("\nPlotting Cumulative Sum Bar Chart of Minutes Since Last Executed Auction...")
+                g_cumulative_minutes = plot_cumulative_trade_minutes_bar(
+                    df_trades_resets,
+                    time_column='trade_timestamp_human',
+                    minutes_column='minutes_since_last_executed_auction',
+                    title=f"Cumulative Sum Bar Chart of Minutes Since Last Executed Auction \n Order Hash: {target_order_hash[:5]}",
+                    date_format="%Y-%m-%d %H:%M" # need to see hours and minutes
+                )
+                filename = f"cumulative_sum_bar_chart_minutes_since_last_executed_auction_{target_order_hash[:5]}.png"
+                save_path = output_dir_str / filename
+                print(f"Saving histogram to: {output_dir}/{filename}")
+                # plt.show() # Show plot interactively
+                g_cumulative_minutes.figure.savefig(save_path, bbox_inches='tight') # Use the .figure attribute
+            except Exception as e:
+                print(f"\nError plotting cumulative sum bar chart of minutes since last executed auction: {e}")
+                raise Exception(f"Error plotting cumulative sum bar chart of minutes since last executed auction: {e}")
+
+        # #####################################################################################
+        # end of get charts for each order hash
+        # #####################################################################################
 
 # write the validation outputs to a pandas dataframe
 df_validation_outputs = pd.DataFrame(validation_outputs)

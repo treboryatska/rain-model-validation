@@ -1,4 +1,6 @@
 import pandas as pd
+from datetime import datetime
+from pathlib import Path
 import os
 from resources import subgraph_urls
 from orders import get_order_info
@@ -16,6 +18,7 @@ from check import (
     clean_model_output_file
 )
 from stats import basic_stats
+from charts import plot_cumulative_trade_minutes_bar
 
 print("\n#################################################################################################################################")
 print("#################################################################################################################################")
@@ -29,27 +32,33 @@ print("#########################################################################
 
 # define the location of the actual model output file
 # connect to google sheets to get the model output file
-model_input_file_path = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTVA_vs84frj7bFwANYpHuTYhZM-tMtIuCODegEI72lHmIVAi1cHIQxGWFjNYCd3DCuVczbmIeZ1pdk/pub?gid=634861611&single=true&output=csv"
-model_output_file_path = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTVA_vs84frj7bFwANYpHuTYhZM-tMtIuCODegEI72lHmIVAi1cHIQxGWFjNYCd3DCuVczbmIeZ1pdk/pub?gid=1770369092&single=true&output=csv"
+model_input_file_path = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTHCa9wcZBBEU3RK8SLwBS66ywFhPdUewg7oJLqjNDfpKvL2yITIMIZjK2No1r-1Ad9b56fVK5l5y2P/pub?gid=634861611&single=true&output=csv"
+model_output_file_path = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTHCa9wcZBBEU3RK8SLwBS66ywFhPdUewg7oJLqjNDfpKvL2yITIMIZjK2No1r-1Ad9b56fVK5l5y2P/pub?gid=454601646&single=true&output=csv"
 
 # Define the network
 # current options are: flare, base, polygon, arbitrum, bsc, linea, ethereum
 # note, this is the network the order was made on
-network = "flare"
+network = "base"
 
 # Define query parameters/variables
-target_order_hash = "0x4e3e14e0cfa2efc8f5f1249f13aa4fa63ff4f0b8285f2b9d56b161ec8ca9c6c1"
+target_order_hash = "0x667d65a1e17d71bb20526fb22619d7d131ef7e832186eb4608606e7c7043d612"
 
 # define the start and end timestamps
 # format: %Y-%m-%d
-start_date_str = "2024-10-01"
-end_date_str = "2024-11-07"
+start_date_str = "2025-03-20"
+end_date_str = "2025-04-06"
 
 # get the Subgraph Endpoint URL
 subgraph_url = subgraph_urls[network]
 
 # inform the user that the model output data must start at row 23
 rows_to_skip = 22
+
+# tell the script where to output the charts
+today = datetime.now().strftime("%Y-%m-%d")
+output_dir = "~/Downloads"
+# create the string path to the output directory -- required for saving chart pngs
+output_dir_str = Path(output_dir).expanduser().resolve()
 
 print("\n--------------------------------\nInput parameters\n--------------------------------\n")
 print(f"Model input file path: {model_input_file_path}")
@@ -354,3 +363,35 @@ print("\n--------------------------------\nFinished getting basic stats for mode
 # #####################################################################################
 # end of get basic stats for modeled trade count between resets and actual trade count between resets
 # #####################################################################################
+
+# #####################################################################################
+# get charts for each order hash
+# #####################################################################################
+
+# ################################################################ chart: 
+# ############# DESCRIPTION: cumulative sum line chart of minutes_since_last_executed_auction
+# ############# X AXIS: trade_timestamp_human
+# ############# Y AXIS: minutes_since_last_executed_auction
+# ################################################################
+try: 
+    print("\nPlotting Cumulative Sum Bar Chart of Minutes Since Last Executed Auction...")
+    g_cumulative_minutes = plot_cumulative_trade_minutes_bar(
+        df_trades_resets,
+        time_column='trade_timestamp_human',
+        minutes_column='minutes_since_last_executed_auction',
+        title=f"Cumulative Sum Bar Chart of Minutes Since Last Executed Auction \n Order Hash: {target_order_hash[:5]}",
+        date_format="%Y-%m-%d %H:%M" # need to see hours and minutes
+    )
+    filename = f"cumulative_sum_bar_chart_minutes_since_last_executed_auction_{target_order_hash[:5]}.png"
+    save_path = output_dir_str / filename
+    print(f"Saving histogram to: {output_dir}/{filename}")
+    # plt.show() # Show plot interactively
+    g_cumulative_minutes.figure.savefig(save_path, bbox_inches='tight') # Use the .figure attribute
+except Exception as e:
+    print(f"\nError plotting cumulative sum bar chart of minutes since last executed auction: {e}")
+    raise Exception(f"Error plotting cumulative sum bar chart of minutes since last executed auction: {e}")
+
+# #####################################################################################
+# end of get charts for each order hash
+# #####################################################################################
+

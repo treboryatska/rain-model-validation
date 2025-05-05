@@ -6,6 +6,7 @@ from matplotlib.ticker import FuncFormatter
 import seaborn as sns
 import numpy as np
 import scipy.stats as stats
+import matplotlib.dates as mdates
 
 # line chart function
 def create_line_chart(df, x_column, y_column, category_column=None, title=None, xlabel=None, ylabel=None, ax=None, figsize=(10, 6)):
@@ -101,6 +102,7 @@ def create_line_chart(df, x_column, y_column, category_column=None, title=None, 
 
     # --- Return Figure and Axes ---
     return fig, ax # Always return both figure and axes
+
 
 # Grouped vertical bar chart function
 def create_grouped_bar_chart(
@@ -817,3 +819,120 @@ def create_qq_plot(df, value_column):
 
     return fig
 
+
+# cumulative sum bar chart
+def plot_cumulative_trade_minutes_bar(
+    df: pd.DataFrame,
+    time_column: str,
+    minutes_column: str,
+    title: str = "Cumulative Minutes Between Trades Over Time",
+    xlabel: str = "Trade Execution Time",
+    ylabel: str = "Cumulative Minutes Between Trades",
+    figsize: tuple = (12, 6),
+    date_format: str = "%Y-%m-%d %H:%M", # Format for x-axis ticks
+    color: str = 'skyblue', # Color for the bars
+    # Bar width can be tricky with time series, often best left to default or calculated
+    # bar_width: float | None = None
+) -> plt.Axes:
+    """
+    Generates a cumulative bar chart showing the sum of minutes between trades
+    against the trade execution time. Each bar represents a trade time.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing the trade data.
+        time_column (str): The name of the column containing trade execution timestamps
+                           (should be datetime or convertible to datetime).
+        minutes_column (str): The name of the column containing the minutes elapsed
+                              since the *previous* trade. The first value might be NaN or 0.
+        title (str, optional): The title for the plot.
+                               Defaults to "Cumulative Minutes Between Trades Over Time".
+        xlabel (str, optional): Label for the x-axis. Defaults to "Trade Execution Time".
+        ylabel (str, optional): Label for the y-axis.
+                               Defaults to "Cumulative Minutes Between Trades".
+        figsize (tuple, optional): Figure size (width, height) in inches.
+                                   Defaults to (12, 6).
+        date_format (str, optional): The format string for displaying dates on the x-axis.
+                                     Defaults to "%Y-%m-%d %H:%M".
+        color (str, optional): The color for the bars. Defaults to 'skyblue'.
+        # bar_width (float, optional): Width of the bars. If None, matplotlib attempts
+        #                              to determine a reasonable width. Defaults to None.
+
+
+    Returns:
+        matplotlib.axes._axes.Axes: The Axes object containing the plot.
+
+    Raises:
+        ValueError: If specified columns are not found or have incorrect types.
+        TypeError: If df is not a pandas DataFrame.
+    """
+    # --- Input Validation ---
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input 'df' must be a pandas DataFrame.")
+
+    required_columns = [time_column, minutes_column]
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns in DataFrame: {missing_columns}")
+
+    # --- Data Preparation ---
+    plot_df = df.copy() # Work on a copy
+
+    # Convert time column to datetime if it's not already
+    try:
+        if not pd.api.types.is_datetime64_any_dtype(plot_df[time_column]):
+            plot_df[time_column] = pd.to_datetime(plot_df[time_column])
+    except Exception as e:
+        raise ValueError(f"Could not convert '{time_column}' to datetime: {e}")
+
+    # Convert minutes column to numeric, coercing errors
+    try:
+        plot_df[minutes_column] = pd.to_numeric(plot_df[minutes_column], errors='coerce')
+    except Exception as e:
+        raise ValueError(f"Could not convert '{minutes_column}' to numeric: {e}")
+
+    # Handle potential NaNs introduced by coercion or already present
+    # Fill NaN with 0, assuming the first trade has 0 minutes before it,
+    # or if there were conversion issues. You might adjust this logic.
+    plot_df[minutes_column] = plot_df[minutes_column].fillna(0)
+
+    # Sort by time - crucial for cumulative sum
+    plot_df = plot_df.sort_values(by=time_column)
+
+    # Calculate cumulative sum
+    cumulative_col_name = f"cumulative_{minutes_column}"
+    plot_df[cumulative_col_name] = plot_df[minutes_column].cumsum()
+
+    # --- Plotting ---
+    fig, ax = plt.subplots(figsize=figsize) # Create figure and axes explicitly
+
+    # Plot the bars
+    # Note: Bar width with datetime axes can sometimes be tricky.
+    # Matplotlib usually does a decent job by default.
+    # You might need to calculate width based on time differences if default isn't good.
+    ax.bar(
+        plot_df[time_column],
+        plot_df[cumulative_col_name],
+        color=color,
+        # width=bar_width # Uncomment and set if you need specific width control
+        align='center' # Align bars on the center of the timestamp
+    )
+
+    # --- Styling and Labels ---
+    ax.set_title(title, fontsize=16, fontweight='bold')
+    ax.set_xlabel(xlabel, fontsize=12)
+    ax.set_ylabel(ylabel, fontsize=12)
+
+    # Format x-axis for dates
+    ax.xaxis.set_major_formatter(mdates.DateFormatter(date_format))
+    plt.xticks(rotation=45, ha='right') # Rotate labels for better readability
+
+    # Add grid lines (optional for bar charts, can make them busy)
+    ax.grid(True, axis='y', linestyle='--', alpha=0.7) # Grid lines only on y-axis
+
+    # Set y-axis limit to start from 0
+    ax.set_ylim(bottom=0)
+
+    # Improve layout
+    plt.tight_layout()
+
+    return ax # Return the Axes object
